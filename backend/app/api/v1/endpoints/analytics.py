@@ -793,3 +793,244 @@ def get_dashboard_stats(
         "monthly_trend": monthly_trend,
         "clearance_rate": round(closed / total_firs * 100, 1) if total_firs > 0 else 0,
     }
+
+
+
+# =============================================================================
+# INNOVATION 9: COMPLAINT TRIAGE (NLP Urgency/Sentiment Detection)
+# =============================================================================
+
+URGENCY_KEYWORDS = {
+    "critical": ["murder", "homicide", "dead", "death", "kill", "gun", "bomb", "explosive", "kidnap", "hostage", "rape", "sexual assault", "minor", "child abuse"],
+    "high": ["assault", "weapon", "knife", "stabbed", "bleeding", "threat to life", "domestic violence", "robbery", "armed", "gunshot", "unconscious"],
+    "medium": ["theft", "stolen", "burglary", "fraud", "cheated", "missing", "harassment", "stalking", "extortion"],
+    "low": ["noise", "parking", "dispute", "nuisance", "trespass", "complaint", "quarrel"],
+}
+
+
+@router.post("/complaint-triage")
+def triage_complaint(
+    complaint_text: str = Query(..., min_length=10),
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user)
+) -> Any:
+    """
+    Auto-triage incoming complaint text.
+    Detects: urgency level, crime type, keywords, whether minors/weapons involved.
+    """
+    text_lower = complaint_text.lower()
+
+    # Detect urgency
+    detected_level = "low"
+    matched_keywords = []
+    for level in ["critical", "high", "medium", "low"]:
+        for keyword in URGENCY_KEYWORDS[level]:
+            if keyword in text_lower:
+                detected_level = level
+                matched_keywords.append(keyword)
+                break
+        if detected_level != "low" or matched_keywords:
+            break
+
+    # Additional flags
+    involves_minor = any(w in text_lower for w in ["child", "minor", "juvenile", "underage", "kid", "school", "boy", "girl"])
+    involves_weapon = any(w in text_lower for w in ["gun", "knife", "weapon", "pistol", "revolver", "blade", "sword", "bomb"])
+    involves_dv = any(w in text_lower for w in ["domestic violence", "husband", "wife beat", "dowry", "in-laws"])
+    threat_to_life = any(w in text_lower for w in ["kill", "murder", "death threat", "life in danger", "suicide"])
+
+    # Auto-suggest crime category
+    suggested_category = "General"
+    category_map = {
+        "Theft": ["theft", "stolen", "stole", "shoplifting"],
+        "Assault": ["assault", "beat", "attack", "hit", "slap", "punch"],
+        "Robbery": ["rob", "robbery", "snatch", "loot"],
+        "Cyber Crime": ["cyber", "online fraud", "hacking", "phishing", "upi fraud"],
+        "Domestic Violence": ["domestic", "dowry", "wife", "husband beat"],
+        "Chain Snatching": ["chain snatch", "gold chain", "chain pulled"],
+        "Drug Trafficking": ["drug", "ganja", "cocaine", "narcotic", "mdma"],
+        "Murder": ["murder", "homicide", "killed", "dead body"],
+        "Fraud": ["fraud", "cheated", "scam", "fake", "duped"],
+        "Vehicle Theft": ["car stolen", "bike stolen", "vehicle theft", "motorcycle"],
+    }
+    for cat, keywords in category_map.items():
+        if any(kw in text_lower for kw in keywords):
+            suggested_category = cat
+            break
+
+    return {
+        "urgency_level": detected_level,
+        "priority_queue": "IMMEDIATE" if detected_level == "critical" else detected_level.upper(),
+        "matched_keywords": matched_keywords,
+        "flags": {
+            "involves_minor": involves_minor,
+            "involves_weapon": involves_weapon,
+            "involves_domestic_violence": involves_dv,
+            "threat_to_life": threat_to_life,
+        },
+        "suggested_category": suggested_category,
+        "recommended_action": (
+            "IMMEDIATE DISPATCH - Life at risk" if threat_to_life
+            else "PRIORITY - Minor involved, escalate to SJPU" if involves_minor
+            else "PRIORITY - Weapon involved, alert armed response" if involves_weapon
+            else "STANDARD PROCESSING"
+        ),
+        "auto_assign_to": (
+            "Cyber Cell" if suggested_category == "Cyber Crime"
+            else "Women's Helpdesk" if involves_dv
+            else "SJPU" if involves_minor
+            else "Duty Officer"
+        ),
+    }
+
+
+# =============================================================================
+# INNOVATION 10: WATCHLIST MANAGEMENT
+# =============================================================================
+
+@router.get("/watchlist")
+def get_watchlists(
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.RoleChecker([
+        UserRole.ADMIN, UserRole.SUPERVISOR, UserRole.INVESTIGATOR
+    ]))
+) -> Any:
+    """Get all active watchlist entries for current user."""
+    items = db.exec(
+        select(Watchlist)
+        .where(Watchlist.is_active == True)
+        .order_by(Watchlist.created_at.desc())
+    ).all()
+    return [{
+        "id": w.id,
+        "name": w.name,
+        "description": w.description,
+        "entity_type": w.entity_type,
+        "entity_value": w.entity_value,
+        "entity_id": w.entity_id,
+        "created_by": w.created_by,
+        "is_active": w.is_active,
+        "created_at": w.created_at.isoformat(),
+        "last_triggered": w.last_triggered.isoformat() if w.last_triggered else None,
+        "trigger_count": w.trigger_count,
+    } for w in items]
+
+
+@router.post("/watchlist")
+def create_watchlist_entry(
+    name: str = Query(...),
+    entity_type: str = Query(..., description="criminal, vehicle, phone, location"),
+    entity_value: str = Query(...),
+    description: Optional[str] = None,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.RoleChecker([
+        UserRole.ADMIN, UserRole.SUPERVISOR, UserRole.INVESTIGATOR
+    ]))
+) -> Any:
+    """Create a new watchlist entry."""
+    watchlist = Watchlist(
+        name=name,
+        entity_type=entity_type,
+        entity_value=entity_value,
+        description=description,
+        created_by=current_user.id,
+    )
+    db.add(watchlist)
+    db.commit()
+    db.refresh(watchlist)
+    return {"message": "Watchlist entry created", "id": watchlist.id}
+
+
+@router.delete("/watchlist/{watchlist_id}")
+def delete_watchlist_entry(
+    watchlist_id: int,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.RoleChecker([
+        UserRole.ADMIN, UserRole.SUPERVISOR, UserRole.INVESTIGATOR
+    ]))
+) -> Any:
+    """Deactivate a watchlist entry."""
+    w = db.get(Watchlist, watchlist_id)
+    if not w:
+        raise HTTPException(status_code=404, detail="Watchlist entry not found")
+    w.is_active = False
+    db.add(w)
+    db.commit()
+    return {"message": "Watchlist entry deactivated"}
+
+
+# =============================================================================
+# INNOVATION: SIMILAR CASE FINDER
+# =============================================================================
+
+@router.get("/similar-cases/{fir_id}")
+def find_similar_cases(
+    fir_id: int,
+    limit: int = Query(default=5, ge=1, le=20),
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.RoleChecker([
+        UserRole.ADMIN, UserRole.SUPERVISOR, UserRole.INVESTIGATOR
+    ]))
+) -> Any:
+    """Find cases similar to the given FIR by MO, location, and category."""
+    target_fir = db.get(FIR, fir_id)
+    if not target_fir:
+        raise HTTPException(status_code=404, detail="FIR not found")
+
+    # Find similar by same category + same area
+    candidates = db.exec(
+        select(FIR)
+        .where(
+            FIR.id != fir_id,
+            FIR.category_id == target_fir.category_id,
+        )
+        .order_by(FIR.incident_date.desc())
+        .limit(50)
+    ).all()
+
+    # Score similarity
+    scored = []
+    for fir in candidates:
+        score = 0
+        # Same category = base score
+        score += 30
+        # Same location
+        if fir.location and target_fir.location and fir.location == target_fir.location:
+            score += 30
+        # Same district
+        if fir.district and target_fir.district and fir.district == target_fir.district:
+            score += 15
+        # Same time of day
+        if fir.time_of_day and target_fir.time_of_day and fir.time_of_day == target_fir.time_of_day:
+            score += 10
+        # Same day of week
+        if fir.day_of_week and target_fir.day_of_week and fir.day_of_week == target_fir.day_of_week:
+            score += 5
+        # Description keyword overlap
+        if fir.description and target_fir.description:
+            words_a = set(target_fir.description.lower().split())
+            words_b = set(fir.description.lower().split())
+            overlap = len(words_a & words_b)
+            score += min(10, overlap)
+
+        scored.append((fir, score))
+
+    scored.sort(key=lambda x: x[1], reverse=True)
+
+    category = db.get(CrimeCategory, target_fir.category_id) if target_fir.category_id else None
+
+    return {
+        "target_fir": target_fir.fir_number,
+        "similar_cases": [{
+            "fir_number": fir.fir_number,
+            "location": fir.location,
+            "incident_date": fir.incident_date.isoformat(),
+            "status": fir.status,
+            "similarity_score": score,
+            "description": fir.description[:150],
+        } for fir, score in scored[:limit]],
+        "search_criteria": {
+            "category": category.name if category else "Unknown",
+            "location": target_fir.location,
+            "time_of_day": target_fir.time_of_day,
+        }
+    }
