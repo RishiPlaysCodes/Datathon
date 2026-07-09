@@ -17,17 +17,17 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
-    description="PRAHARI - Predictive Relational AI for Holistic Analytics & Response Intelligence",
+    description="PRAHARI - Crime Intelligence Operating System",
     version="2.0.0",
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
     lifespan=lifespan,
 )
 
-# CORS - Allow all origins for development
+# CORS - Allow ALL origins in development
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:5174", "http://localhost:3000", "http://127.0.0.1:5173", "http://127.0.0.1:5174"],
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -35,17 +35,12 @@ app.add_middleware(
 
 @app.get("/")
 async def root():
-    return {
-        "name": "PRAHARI",
-        "description": "Crime Intelligence Operating System - Karnataka State Police",
-        "version": "2.0.0",
-        "status": "operational"
-    }
+    return {"message": "PRAHARI Crime Intelligence OS - API Running"}
 
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy", "service": "PRAHARI Backend"}
+    return {"status": "healthy"}
 
 
 app.include_router(api_router, prefix=settings.API_V1_STR)

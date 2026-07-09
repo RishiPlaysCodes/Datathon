@@ -7,14 +7,14 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
 
     # CORS
-    BACKEND_CORS_ORIGINS: List[str] = ["http://localhost:5173", "http://localhost:5174", "http://localhost:3000", "*"]
+    BACKEND_CORS_ORIGINS: List[str] = ["*"]
 
     # Database
     POSTGRES_SERVER: str = "localhost"
     POSTGRES_USER: str = "postgres"
     POSTGRES_PASSWORD: str = "password"
     POSTGRES_DB: str = "ksp_db"
-    POSTGRES_PORT: str = "5432"
+    POSTGRES_PORT: str = "5433"
 
     @property
     def DATABASE_URL(self) -> str:
@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     # AI
     GOOGLE_API_KEY: str = ""
     CHROMA_HOST: str = "localhost"
-    CHROMA_PORT: int = 8000
+    CHROMA_PORT: int = 8100
 
     # Auth
     SECRET_KEY: str = "PRAHARI_DEVELOPMENT_SECRET_KEY_2026_REPLACE_IN_PRODUCTION"
