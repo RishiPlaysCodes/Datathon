@@ -564,14 +564,14 @@ def seed_db():
             num_criminals = random.choices([0, 1, 2, 3], weights=[10, 50, 30, 10])[0]
             if num_criminals > 0:
                 # 30% chance to use a gang member (repeat offender)
-                selected = []
+                selected = set()
                 for _ in range(num_criminals):
                     if random.random() > 0.7 and gang_criminals:
-                        selected.append(random.choice(gang_criminals))
+                        selected.add(random.choice(gang_criminals).id)
                     else:
-                        selected.append(random.choice(criminals))
-                for crim in selected:
-                    link = FIRCriminalLink(fir_id=fir.id, criminal_id=crim.id)
+                        selected.add(random.choice(criminals).id)
+                for crim_id in selected:
+                    link = FIRCriminalLink(fir_id=fir.id, criminal_id=crim_id)
                     session.add(link)
 
         # Link victims to FIRs
@@ -579,9 +579,12 @@ def seed_db():
         for fir in firs:
             num_victims = random.randint(1, 2)
             selected_victims = random.sample(victims, min(num_victims, len(victims)))
+            seen_ids = set()
             for vic in selected_victims:
-                link = FIRVictimLink(fir_id=fir.id, victim_id=vic.id)
-                session.add(link)
+                if vic.id not in seen_ids:
+                    seen_ids.add(vic.id)
+                    link = FIRVictimLink(fir_id=fir.id, victim_id=vic.id)
+                    session.add(link)
 
         # Link witnesses to FIRs
         print("   Linking witnesses to FIRs...")
@@ -589,9 +592,12 @@ def seed_db():
             if random.random() > 0.4:  # 60% of FIRs have witnesses
                 num_witnesses = random.randint(1, 2)
                 selected_witnesses = random.sample(witnesses, min(num_witnesses, len(witnesses)))
+                seen_ids = set()
                 for wit in selected_witnesses:
-                    link = FIRWitnessLink(fir_id=fir.id, witness_id=wit.id)
-                    session.add(link)
+                    if wit.id not in seen_ids:
+                        seen_ids.add(wit.id)
+                        link = FIRWitnessLink(fir_id=fir.id, witness_id=wit.id)
+                        session.add(link)
 
         session.commit()
 
