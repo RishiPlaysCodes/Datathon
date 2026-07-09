@@ -1,4 +1,5 @@
 """Authentication endpoints."""
+import logging
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -15,6 +16,7 @@ from app.core.security import (
 )
 from app.api.deps import get_current_user
 
+logger = logging.getLogger("prahari")
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 
@@ -59,16 +61,27 @@ async def register(user_data: UserCreate, db: AsyncSession = Depends(get_db)):
 @router.post("/login", response_model=TokenResponse)
 async def login(credentials: UserLogin, db: AsyncSession = Depends(get_db)):
     """Login and get JWT tokens."""
+    logger.info(f"Login attempt: username='{credentials.username}'")
+    
     result = await db.execute(select(User).where(User.username == credentials.username))
     user = result.scalar_one_or_none()
 
-    if not user or not verify_password(credentials.password, user.hashed_password):
+    if not user:
+        logger.warning(f"Login failed: user '{credentials.username}' not found in database")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid credentials",
+            detail="Invalid credentials - user not found. Did you run the seed script?",
+        )
+    
+    if not verify_password(credentials.password, user.hashed_password):
+        logger.warning(f"Login failed: wrong password for '{credentials.username}'")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid credentials - wrong password",
         )
 
     if not user.is_active:
+        logger.warning(f"Login failed: account disabled for '{credentials.username}'")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Account is disabled",
@@ -76,6 +89,8 @@ async def login(credentials: UserLogin, db: AsyncSession = Depends(get_db)):
 
     access_token = create_access_token(data={"sub": user.username, "role": user.role})
     refresh_token = create_refresh_token(data={"sub": user.username})
+
+    logger.info(f"Login SUCCESS: {user.full_name} ({user.role})")
 
     return TokenResponse(
         access_token=access_token,
