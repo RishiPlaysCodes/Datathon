@@ -8,14 +8,14 @@ services:
       - POSTGRES_PASSWORD=password
       - POSTGRES_DB=ksp_db
     ports:
-      - "5432:5432"
+      - "5433:5432"
 
   chromadb:
     image: chromadb/chroma
     volumes:
       - chroma_data:/chroma/chroma
     ports:
-      - "8000:8000"
+      - "8100:8000"
 
   backend:
     build: ./backend
@@ -26,8 +26,10 @@ services:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=password
       - POSTGRES_DB=ksp_db
+      - POSTGRES_PORT=5432
       - GOOGLE_API_KEY=${GOOGLE_API_KEY}
       - CHROMA_HOST=chromadb
+      - CHROMA_PORT=8000
     depends_on:
       - db
       - chromadb
