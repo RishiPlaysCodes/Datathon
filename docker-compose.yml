@@ -1,46 +1,87 @@
+version: '3.8'
+
 services:
+  # PostgreSQL Database
   db:
     image: postgres:15-alpine
-    volumes:
-      - postgres_data:/var/lib/postgresql/data/
     environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=password
-      - POSTGRES_DB=ksp_db
+      POSTGRES_DB: prahari
+      POSTGRES_USER: prahari
+      POSTGRES_PASSWORD: prahari123
     ports:
       - "5432:5432"
-
-  chromadb:
-    image: chromadb/chroma
     volumes:
-      - chroma_data:/chroma/chroma
-    ports:
-      - "8000:8000"
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U prahari"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # FastAPI Backend
   backend:
-    build: ./backend
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8001"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://prahari:prahari123@db:5432/prahari
+      - DATABASE_URL_SYNC=postgresql://prahari:prahari123@db:5432/prahari
+      - REDIS_URL=redis://redis:6379/0
+      - SECRET_KEY=prahari-super-secret-key-change-in-production-2026
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     volumes:
       - ./backend:/app
-    environment:
-      - POSTGRES_SERVER=db
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=password
-      - POSTGRES_DB=ksp_db
-      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
-      - CHROMA_HOST=chromadb
-    depends_on:
-      - db
-      - chromadb
-    ports:
-      - "8001:8000"
+    restart: unless-stopped
 
+  # React Frontend
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
     ports:
-      - "5173:80"
+      - "5174:5174"
+    environment:
+      - VITE_API_URL=http://localhost:8001
     depends_on:
       - backend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    restart: unless-stopped
+
+  # Database Seeder (one-time)
+  seeder:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command: python -c "import asyncio; from app.db.init_db import init_database; asyncio.run(init_database())"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://prahari:prahari123@db:5432/prahari
+      - DATABASE_URL_SYNC=postgresql://prahari:prahari123@db:5432/prahari
+      - REDIS_URL=redis://redis:6379/0
+      - SECRET_KEY=prahari-super-secret-key-change-in-production-2026
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
 
 volumes:
   postgres_data:
-  chroma_data:

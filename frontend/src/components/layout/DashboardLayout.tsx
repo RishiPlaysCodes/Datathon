@@ -1,24 +1,15 @@
-import { SidebarProvider } from '@/components/ui/sidebar';
-import AppSidebar from './Sidebar';
-import TopNav from './TopNav';
-import { Outlet } from 'react-router-dom';
-import { Toaster } from '@/components/ui/sonner';
+import { Outlet } from 'react-router-dom'
+import { Sidebar } from './Sidebar'
 
-const DashboardLayout = () => {
+export function DashboardLayout() {
   return (
-    <SidebarProvider>
-      <div className="flex min-h-screen w-full bg-background">
-        <AppSidebar />
-        <div className="flex flex-1 flex-col">
-          <TopNav />
-          <main className="flex-1 p-4 md:p-6 lg:p-8">
-            <Outlet />
-          </main>
+    <div className="min-h-screen bg-dark-950">
+      <Sidebar />
+      <main className="ml-64 min-h-screen">
+        <div className="p-6">
+          <Outlet />
         </div>
-        <Toaster position="top-right" />
-      </div>
-    </SidebarProvider>
-  );
-};
-
-export default DashboardLayout;
+      </main>
+    </div>
+  )
+}

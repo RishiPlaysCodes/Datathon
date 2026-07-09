@@ -1,59 +1,59 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
-import { AuthProvider } from './context/AuthContext'
-import ProtectedRoute from './components/ProtectedRoute'
-import DashboardLayout from './components/layout/DashboardLayout'
-import Login from './pages/Login'
-import Dashboard from './pages/Dashboard'
-import ForgotPassword from './pages/ForgotPassword'
-import AIAssistant from './pages/AIAssistant'
-import CrimeSearch from './pages/CrimeSearch'
-import CrimeAnalytics from './pages/CrimeAnalytics'
-import CrimeHotspots from './pages/CrimeHotspots'
-import CriminalNetwork from './pages/CriminalNetwork'
-import AssignedCases from './pages/AssignedCases'
-import AuditLogs from './pages/AuditLogs'
-import { TooltipProvider } from './components/ui/tooltip'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { Toaster } from 'react-hot-toast'
+import { useAuthStore } from '@/stores/authStore'
+import { DashboardLayout } from '@/components/layout/DashboardLayout'
+import { LoginPage } from '@/pages/LoginPage'
+import { DashboardPage } from '@/pages/DashboardPage'
+import { ChatPage } from '@/pages/ChatPage'
+import { FIRsPage } from '@/pages/FIRsPage'
+import { NetworkPage } from '@/pages/NetworkPage'
+import { HotspotsPage } from '@/pages/HotspotsPage'
+import { AccusedPage } from '@/pages/AccusedPage'
+import { AnalyticsPage } from '@/pages/AnalyticsPage'
+import { AuditPage } from '@/pages/AuditPage'
 
-const queryClient = new QueryClient()
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated } = useAuthStore()
+  if (!isAuthenticated) return <Navigate to="/login" replace />
+  return <>{children}</>
+}
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <TooltipProvider>
-          <BrowserRouter>
-            <Routes>
-              <Route path="/login" element={<Login />} />
-              <Route path="/forgot-password" element={<ForgotPassword />} />
-              
-              <Route element={<ProtectedRoute />}>
-                <Route element={<DashboardLayout />}>
-                  <Route path="/" element={<Dashboard />} />
-                  <Route path="/ai-assistant" element={<AIAssistant />} />
-                  <Route path="/search" element={<CrimeSearch />} />
-                  <Route path="/cases" element={<AssignedCases />} />
-                  <Route path="/settings" element={<div>Settings (Coming Soon)</div>} />
-
-                  {/* Investigator + Admin */}
-                  <Route element={<ProtectedRoute allowedRoles={['admin', 'investigator']} />}>
-                    <Route path="/analytics" element={<CrimeAnalytics />} />
-                    <Route path="/hotspots" element={<CrimeHotspots />} />
-                    <Route path="/network" element={<CriminalNetwork />} />
-                    <Route path="/reports" element={<div>Reports (Coming Soon)</div>} />
-                  </Route>
-
-                  {/* Admin Only */}
-                  <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
-                    <Route path="/logs" element={<AuditLogs />} />
-                  </Route>
-                </Route>
-              </Route>
-            </Routes>
-          </BrowserRouter>
-        </TooltipProvider>
-      </AuthProvider>
-    </QueryClientProvider>
+    <BrowserRouter>
+      <Toaster
+        position="top-right"
+        toastOptions={{
+          style: {
+            background: '#1e293b',
+            color: '#e2e8f0',
+            border: '1px solid #334155',
+          },
+        }}
+      />
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route
+          path="/"
+          element={
+            <ProtectedRoute>
+              <DashboardLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<Navigate to="/dashboard" replace />} />
+          <Route path="dashboard" element={<DashboardPage />} />
+          <Route path="chat" element={<ChatPage />} />
+          <Route path="firs" element={<FIRsPage />} />
+          <Route path="network" element={<NetworkPage />} />
+          <Route path="hotspots" element={<HotspotsPage />} />
+          <Route path="accused" element={<AccusedPage />} />
+          <Route path="analytics" element={<AnalyticsPage />} />
+          <Route path="audit" element={<AuditPage />} />
+        </Route>
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      </Routes>
+    </BrowserRouter>
   )
 }
 
