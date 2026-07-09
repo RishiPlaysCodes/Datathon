@@ -30,9 +30,9 @@ router = APIRouter()
 # Helper to define all CRUD endpoints for a given service/model/prefix
 def define_crud_routes(router, service, model, create_schema, update_schema, prefix, tags, allowed_roles_read=None, allowed_roles_write=None):
     if allowed_roles_read is None:
-        allowed_roles_read = [UserRole.ADMIN, UserRole.INVESTIGATOR, UserRole.OFFICER]
+        allowed_roles_read = [UserRole.ADMIN, UserRole.SUPERVISOR, UserRole.INVESTIGATOR, UserRole.CONSTABLE]
     if allowed_roles_write is None:
-        allowed_roles_write = [UserRole.ADMIN, UserRole.INVESTIGATOR]
+        allowed_roles_write = [UserRole.ADMIN, UserRole.SUPERVISOR, UserRole.INVESTIGATOR]
 
     @router.get(f"/{prefix}", response_model=List[model], tags=tags)
     def read_multi(
