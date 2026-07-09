@@ -1,7 +1,8 @@
 fastapi
-uvicorn
+uvicorn[standard]
 langchain
 langchain-google-genai
+langchain-core
 chromadb
 psycopg[binary]
 pydantic-settings
@@ -14,3 +15,11 @@ alembic
 faker
 email-validator
 pydantic[email]
+networkx
+rapidfuzz
+scikit-learn
+numpy
+pandas
+reportlab
+jinja2
+httpx

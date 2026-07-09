@@ -1,6 +1,10 @@
 import React from 'react';
 import { Sidebar, SidebarContent, SidebarHeader, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarFooter } from '@/components/ui/sidebar';
-import { LayoutDashboard, MessageSquare, Search, BarChart3, MapPin, Share2, FileText, History, Settings, LogOut } from 'lucide-react';
+import {
+  LayoutDashboard, MessageSquare, Search, BarChart3, MapPin,
+  Share2, FileText, History, LogOut, Users, Shield,
+  DollarSign, Bell, BookOpen, UserCheck
+} from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import type { UserRole } from '@/types/auth';
 import { Link, useLocation } from 'react-router-dom';
@@ -13,24 +17,28 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { title: 'Dashboard', icon: LayoutDashboard, path: '/', roles: ['admin', 'investigator', 'officer'] },
-  { title: 'AI Assistant', icon: MessageSquare, path: '/ai-assistant', roles: ['admin', 'investigator', 'officer'] },
-  { title: 'Crime Search', icon: Search, path: '/search', roles: ['admin', 'investigator', 'officer'] },
-  { title: 'Assigned Cases', icon: History, path: '/cases', roles: ['admin', 'investigator', 'officer'] },
-  { title: 'Crime Analytics', icon: BarChart3, path: '/analytics', roles: ['admin', 'investigator'] },
-  { title: 'Crime Hotspots', icon: MapPin, path: '/hotspots', roles: ['admin', 'investigator'] },
-  { title: 'Criminal Network', icon: Share2, path: '/network', roles: ['admin', 'investigator'] },
-  { title: 'Reports', icon: FileText, path: '/reports', roles: ['admin', 'investigator'] },
-  { title: 'Audit Logs', icon: History, path: '/logs', roles: ['admin'] },
-  { title: 'Settings', icon: Settings, path: '/settings', roles: ['admin', 'investigator', 'officer'] },
+  { title: 'Dashboard', icon: LayoutDashboard, path: '/', roles: ['admin', 'supervisor', 'investigator', 'analyst', 'constable', 'policymaker'] },
+  { title: 'AI Assistant', icon: MessageSquare, path: '/ai-assistant', roles: ['admin', 'supervisor', 'investigator', 'analyst', 'constable'] },
+  { title: 'Crime Search', icon: Search, path: '/search', roles: ['admin', 'supervisor', 'investigator', 'analyst', 'constable'] },
+  { title: 'Assigned Cases', icon: FileText, path: '/cases', roles: ['admin', 'supervisor', 'investigator', 'constable'] },
+  { title: 'Criminal Network', icon: Share2, path: '/network', roles: ['admin', 'supervisor', 'investigator', 'analyst'] },
+  { title: 'Crime Hotspots', icon: MapPin, path: '/hotspots', roles: ['admin', 'supervisor', 'investigator', 'analyst'] },
+  { title: 'Crime Analytics', icon: BarChart3, path: '/analytics', roles: ['admin', 'supervisor', 'investigator', 'analyst', 'policymaker'] },
+  { title: 'Offender Profiling', icon: UserCheck, path: '/offenders', roles: ['admin', 'supervisor', 'investigator'] },
+  { title: 'Decision Support', icon: Shield, path: '/decision-support', roles: ['admin', 'supervisor', 'investigator'] },
+  { title: 'Financial Crime', icon: DollarSign, path: '/financial', roles: ['admin', 'supervisor', 'investigator'] },
+  { title: 'Forecasting', icon: Bell, path: '/alerts', roles: ['admin', 'supervisor', 'investigator', 'analyst'] },
+  { title: 'Sociological', icon: BookOpen, path: '/sociological', roles: ['admin', 'supervisor', 'analyst', 'policymaker'] },
+  { title: 'Audit Logs', icon: History, path: '/logs', roles: ['admin', 'supervisor'] },
 ];
+
 
 const AppSidebar = () => {
   const { user, logout } = useAuth();
   const location = useLocation();
 
-  const filteredNavItems = navItems.filter(item => 
-    user && item.roles.includes(user.role)
+  const filteredNavItems = navItems.filter(item =>
+    user && item.roles.includes(user.role as UserRole)
   );
 
   return (
@@ -38,25 +46,25 @@ const AppSidebar = () => {
       <SidebarHeader className="border-b border-sidebar-border p-4">
         <div className="flex items-center gap-3">
           <div className="bg-primary text-primary-foreground p-1.5 rounded-md">
-            <img src="https://upload.wikimedia.org/wikipedia/commons/1/13/Seal_of_Karnataka.svg" alt="KSP" className="w-6 h-6 invert" />
+            <Shield className="w-5 h-5" />
           </div>
           <div className="flex flex-col">
-            <span className="font-bold text-sm leading-none">KSP AI</span>
-            <span className="text-[10px] text-muted-foreground uppercase tracking-wider mt-1">Investigation</span>
+            <span className="font-bold text-sm leading-none">PRAHARI</span>
+            <span className="text-[9px] text-muted-foreground uppercase tracking-wider mt-1">Crime Intelligence OS</span>
           </div>
         </div>
       </SidebarHeader>
       <SidebarContent>
-        <SidebarMenu className="p-2 gap-1">
+        <SidebarMenu className="p-2 gap-0.5">
           {filteredNavItems.map((item) => (
             <SidebarMenuItem key={item.path}>
-              <SidebarMenuButton 
+              <SidebarMenuButton
                 isActive={location.pathname === item.path}
                 tooltip={item.title}
               >
-                <Link to={item.path}>
+                <Link to={item.path} className="flex items-center gap-2 w-full">
                   <item.icon className="w-4 h-4" />
-                  <span>{item.title}</span>
+                  <span className="text-xs">{item.title}</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
@@ -68,7 +76,7 @@ const AppSidebar = () => {
           <SidebarMenuItem>
             <SidebarMenuButton onClick={logout}>
               <LogOut className="w-4 h-4 text-destructive" />
-              <span className="text-destructive">Logout</span>
+              <span className="text-destructive text-xs">Logout</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>

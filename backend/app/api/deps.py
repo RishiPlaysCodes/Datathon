@@ -1,18 +1,24 @@
+import hashlib
+import json
+from datetime import datetime, timezone
 from typing import Generator
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import jwt, JWTError
 from sqlmodel import Session, select
 from app.db.session import engine
 from app.core.config import settings
 from app.models.user import User, UserRole
+from app.models.crime import AuditLog
 from app.schemas.user import TokenData
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login")
 
+
 def get_db() -> Generator:
     with Session(engine) as session:
         yield session
+
 
 def get_current_user(
     db: Session = Depends(get_db),
@@ -31,11 +37,14 @@ def get_current_user(
         token_data = TokenData(username=username)
     except JWTError:
         raise credentials_exception
-    
+
     user = db.exec(select(User).where(User.username == token_data.username)).first()
     if user is None:
         raise credentials_exception
+    if not user.is_active:
+        raise HTTPException(status_code=400, detail="Inactive user")
     return user
+
 
 class RoleChecker:
     def __init__(self, allowed_roles: list[UserRole]):
@@ -48,3 +57,52 @@ class RoleChecker:
                 detail="The user doesn't have enough privileges",
             )
         return user
+
+
+# Hash-chained audit logging
+def create_audit_log(
+    db: Session,
+    user_id: int,
+    action: str,
+    entity_name: str,
+    entity_id: int = None,
+    details: str = None,
+    query_text: str = None,
+    sensitivity_level: str = "low",
+    ip_address: str = None
+):
+    """Create a hash-chained audit log entry."""
+    # Get the last audit log entry for hash chaining
+    last_log = db.exec(
+        select(AuditLog).order_by(AuditLog.id.desc()).limit(1)
+    ).first()
+
+    previous_hash = last_log.current_hash if last_log else "GENESIS"
+
+    # Create hash of current entry
+    log_data = {
+        "user_id": user_id,
+        "action": action,
+        "entity_name": entity_name,
+        "entity_id": entity_id,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "previous_hash": previous_hash
+    }
+    current_hash = hashlib.sha256(json.dumps(log_data, sort_keys=True).encode()).hexdigest()
+
+    audit_log = AuditLog(
+        user_id=user_id,
+        action=action,
+        entity_name=entity_name,
+        entity_id=entity_id,
+        details=details,
+        query_text=query_text,
+        sensitivity_level=sensitivity_level,
+        ip_address=ip_address,
+        previous_hash=previous_hash,
+        current_hash=current_hash,
+        timestamp=datetime.now(timezone.utc)
+    )
+    db.add(audit_log)
+    db.commit()
+    return audit_log
