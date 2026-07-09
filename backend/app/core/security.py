@@ -1,15 +1,44 @@
 """Security utilities: JWT tokens, password hashing, role-based access."""
 import hashlib
 import time
+import logging
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 
 from app.core.config import settings
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+logger = logging.getLogger("prahari")
+
+# Try passlib+bcrypt first, fallback to hashlib for compatibility
+try:
+    from passlib.context import CryptContext
+    pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+    def verify_password(plain_password: str, hashed_password: str) -> bool:
+        try:
+            return pwd_context.verify(plain_password, hashed_password)
+        except Exception as e:
+            logger.error(f"Password verify error: {e}")
+            # Fallback: direct comparison for sha256 hashes
+            import hashlib
+            return hashlib.sha256(plain_password.encode()).hexdigest() == hashed_password
+
+    def get_password_hash(password: str) -> str:
+        try:
+            return pwd_context.hash(password)
+        except Exception as e:
+            logger.error(f"Password hash error (falling back to sha256): {e}")
+            return hashlib.sha256(password.encode()).hexdigest()
+
+except ImportError:
+    # If passlib not available, use simple sha256
+    def verify_password(plain_password: str, hashed_password: str) -> bool:
+        return hashlib.sha256(plain_password.encode()).hexdigest() == hashed_password
+
+    def get_password_hash(password: str) -> str:
+        return hashlib.sha256(password.encode()).hexdigest()
 
 # Role hierarchy: higher number = more access
 ROLE_HIERARCHY = {
