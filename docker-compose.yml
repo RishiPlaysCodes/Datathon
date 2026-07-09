@@ -17,32 +17,6 @@ services:
     ports:
       - "8100:8000"
 
-  backend:
-    build: ./backend
-    volumes:
-      - ./backend:/app
-    environment:
-      - POSTGRES_SERVER=db
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=password
-      - POSTGRES_DB=ksp_db
-      - POSTGRES_PORT=5432
-      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
-      - CHROMA_HOST=chromadb
-      - CHROMA_PORT=8000
-    depends_on:
-      - db
-      - chromadb
-    ports:
-      - "8001:8000"
-
-  frontend:
-    build: ./frontend
-    ports:
-      - "5173:80"
-    depends_on:
-      - backend
-
 volumes:
   postgres_data:
   chroma_data:
