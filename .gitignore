@@ -2,22 +2,33 @@
 __pycache__/
 *.py[cod]
 *$py.class
-.env
-.venv
+*.so
+.Python
 env/
 venv/
-build/
-dist/
+.venv/
 
 # Node
 node_modules/
 dist/
+build/
+
+# Environment
 .env
 .env.local
 
 # IDE
 .vscode/
 .idea/
+*.swp
+*.swo
 
-# Docker
-.docker/
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker volumes
+postgres_data/
+
+# Misc
+*.log

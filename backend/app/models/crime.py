@@ -1,135 +1,100 @@
-from datetime import datetime, timezone
-from enum import Enum
-from typing import Optional, List
-from sqlmodel import Field, SQLModel, Relationship
+"""Crime-related database models."""
+from sqlalchemy import Column, Integer, String, DateTime, Text, Float, Boolean, Date
+from sqlalchemy.sql import func
+from app.db.session import Base
 
-# Enums
-class FIRStatus(str, Enum):
-    OPEN = "open"
-    UNDER_INVESTIGATION = "under_investigation"
-    CLOSED = "closed"
-    COLD_CASE = "cold_case"
 
-class EvidenceType(str, Enum):
-    DOCUMENT = "document"
-    IMAGE = "image"
-    VIDEO = "video"
-    AUDIO = "audio"
-    PHYSICAL = "physical"
-    DIGITAL = "digital"
+class FIR(Base):
+    __tablename__ = "firs"
 
-# Many-to-Many Link Tables
-class FIRCriminalLink(SQLModel, table=True):
-    fir_id: Optional[int] = Field(default=None, foreign_key="fir.id", primary_key=True)
-    criminal_id: Optional[int] = Field(default=None, foreign_key="criminal.id", primary_key=True)
+    id = Column(Integer, primary_key=True, index=True)
+    fir_number = Column(String(50), unique=True, index=True, nullable=False)
+    station_id = Column(String(50), index=True, nullable=False)
+    station_name = Column(String(255), nullable=False)
+    district = Column(String(100), index=True, nullable=False)
+    crime_type = Column(String(100), index=True, nullable=False)
+    crime_subtype = Column(String(100), nullable=True)
+    ipc_section = Column(String(100), nullable=True)
+    bns_section = Column(String(100), nullable=True)
+    description = Column(Text, nullable=False)
+    modus_operandi = Column(Text, nullable=True)
+    date_of_occurrence = Column(DateTime(timezone=True), nullable=False)
+    date_of_registration = Column(DateTime(timezone=True), server_default=func.now())
+    location_name = Column(String(255), nullable=True)
+    latitude = Column(Float, nullable=True)
+    longitude = Column(Float, nullable=True)
+    status = Column(String(50), default="open")  # open, investigating, closed, chargesheeted
+    severity = Column(String(20), default="medium")  # low, medium, high, critical
+    investigating_officer = Column(String(255), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
-class FIRVictimLink(SQLModel, table=True):
-    fir_id: Optional[int] = Field(default=None, foreign_key="fir.id", primary_key=True)
-    victim_id: Optional[int] = Field(default=None, foreign_key="victim.id", primary_key=True)
 
-class FIRWitnessLink(SQLModel, table=True):
-    fir_id: Optional[int] = Field(default=None, foreign_key="fir.id", primary_key=True)
-    witness_id: Optional[int] = Field(default=None, foreign_key="witness.id", primary_key=True)
+class Accused(Base):
+    __tablename__ = "accused"
 
-# Main Models
-class PoliceStation(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
-    name: str = Field(index=True)
-    location: str
-    district: str
-    contact_number: str
-    
-    officers: List["Officer"] = Relationship(back_populates="police_station")
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(255), index=True, nullable=False)
+    alias = Column(String(255), nullable=True)
+    age = Column(Integer, nullable=True)
+    gender = Column(String(20), nullable=True)
+    phone = Column(String(20), nullable=True)
+    address = Column(Text, nullable=True)
+    id_type = Column(String(50), nullable=True)  # aadhaar, pan, driving_license
+    id_number = Column(String(100), nullable=True)
+    risk_score = Column(Float, default=0.0)
+    is_repeat_offender = Column(Boolean, default=False)
+    total_cases = Column(Integer, default=1)
+    gang_id = Column(String(50), nullable=True)
+    photo_url = Column(String(500), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-class Officer(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
-    name: str = Field(index=True)
-    badge_number: str = Field(unique=True, index=True)
-    rank: str
-    contact_number: str
-    police_station_id: Optional[int] = Field(default=None, foreign_key="policestation.id")
-    user_id: Optional[int] = Field(default=None, foreign_key="user.id")
-    
-    police_station: Optional[PoliceStation] = Relationship(back_populates="officers")
-    firs: List["FIR"] = Relationship(back_populates="investigating_officer")
 
-class CrimeCategory(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
-    name: str = Field(unique=True, index=True)
-    description: Optional[str] = None
-    
-    firs: List["FIR"] = Relationship(back_populates="category")
+class Victim(Base):
+    __tablename__ = "victims"
 
-class Criminal(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
-    name: str = Field(index=True)
-    alias: Optional[str] = None
-    address: str
-    phone_number: Optional[str] = None
-    criminal_record: Optional[str] = None
-    
-    firs: List["FIR"] = Relationship(back_populates="criminals", link_model=FIRCriminalLink)
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(255), nullable=False)
+    age = Column(Integer, nullable=True)
+    gender = Column(String(20), nullable=True)
+    phone = Column(String(20), nullable=True)
+    address = Column(Text, nullable=True)
+    fir_id = Column(Integer, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-class Victim(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
-    name: str = Field(index=True)
-    address: str
-    phone_number: str
-    
-    firs: List["FIR"] = Relationship(back_populates="victims", link_model=FIRVictimLink)
 
-class Witness(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
-    name: str = Field(index=True)
-    address: str
-    phone_number: str
-    
-    firs: List["FIR"] = Relationship(back_populates="witnesses", link_model=FIRWitnessLink)
+class FIRAccusedLink(Base):
+    __tablename__ = "fir_accused_links"
 
-class FIR(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
-    fir_number: str = Field(unique=True, index=True)
-    incident_date: datetime
-    registration_date: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    location: str
-    description: str
-    status: FIRStatus = Field(default=FIRStatus.OPEN)
-    
-    category_id: Optional[int] = Field(default=None, foreign_key="crimecategory.id")
-    officer_id: Optional[int] = Field(default=None, foreign_key="officer.id")
-    
-    category: Optional[CrimeCategory] = Relationship(back_populates="firs")
-    investigating_officer: Optional[Officer] = Relationship(back_populates="firs")
-    criminals: List[Criminal] = Relationship(back_populates="firs", link_model=FIRCriminalLink)
-    victims: List[Victim] = Relationship(back_populates="firs", link_model=FIRVictimLink)
-    witnesses: List[Witness] = Relationship(back_populates="firs", link_model=FIRWitnessLink)
-    evidence: List["Evidence"] = Relationship(back_populates="fir")
-    reports: List["InvestigationReport"] = Relationship(back_populates="fir")
+    id = Column(Integer, primary_key=True, index=True)
+    fir_id = Column(Integer, nullable=False, index=True)
+    accused_id = Column(Integer, nullable=False, index=True)
+    role = Column(String(50), default="primary")  # primary, accomplice, abettor
 
-class Evidence(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
-    fir_id: int = Field(foreign_key="fir.id")
-    type: EvidenceType
-    description: str
-    file_path: Optional[str] = None
-    collected_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    
-    fir: Optional[FIR] = Relationship(back_populates="evidence")
 
-class InvestigationReport(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
-    fir_id: int = Field(foreign_key="fir.id")
-    report_content: str
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    
-    fir: Optional[FIR] = Relationship(back_populates="reports")
+class CriminalNetwork(Base):
+    __tablename__ = "criminal_networks"
 
-class AuditLog(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: int = Field(foreign_key="user.id")
-    action: str
-    entity_name: str
-    entity_id: Optional[int] = None
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    details: Optional[str] = None
+    id = Column(Integer, primary_key=True, index=True)
+    source_accused_id = Column(Integer, nullable=False, index=True)
+    target_accused_id = Column(Integer, nullable=False, index=True)
+    relationship_type = Column(String(100), nullable=False)  # co-accused, associate, gang_member
+    strength = Column(Float, default=1.0)
+    shared_firs = Column(Text, nullable=True)  # JSON list of FIR IDs
+    first_seen = Column(DateTime(timezone=True), nullable=True)
+    last_seen = Column(DateTime(timezone=True), nullable=True)
+
+
+class Transaction(Base):
+    __tablename__ = "transactions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    accused_id = Column(Integer, nullable=True)
+    from_account = Column(String(100), nullable=False)
+    to_account = Column(String(100), nullable=False)
+    amount = Column(Float, nullable=False)
+    transaction_type = Column(String(50), nullable=False)  # upi, bank, cash, crypto
+    timestamp = Column(DateTime(timezone=True), nullable=False)
+    is_suspicious = Column(Boolean, default=False)
+    fir_id = Column(Integer, nullable=True)
+    notes = Column(Text, nullable=True)
