@@ -1,95 +1,147 @@
-from pydantic import BaseModel, ConfigDict
+"""Crime-related Pydantic schemas."""
+from pydantic import BaseModel
+from typing import Optional, List, Dict, Any
 from datetime import datetime
-from typing import Optional, List
-from app.models.crime import FIRStatus, EvidenceType
 
-# Base Schemas
-class PoliceStationBase(BaseModel):
-    name: str
-    location: str
+
+# --- FIR Schemas ---
+class FIRResponse(BaseModel):
+    id: int
+    fir_number: str
+    station_name: str
     district: str
-    contact_number: str
+    crime_type: str
+    crime_subtype: Optional[str] = None
+    ipc_section: Optional[str] = None
+    bns_section: Optional[str] = None
+    description: str
+    modus_operandi: Optional[str] = None
+    date_of_occurrence: Optional[datetime] = None
+    location_name: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    status: str
+    severity: str
+    investigating_officer: Optional[str] = None
 
-class PoliceStationCreate(PoliceStationBase): pass
-class PoliceStationUpdate(PoliceStationBase): pass
+    class Config:
+        from_attributes = True
 
-class OfficerBase(BaseModel):
-    name: str
-    badge_number: str
-    rank: str
-    contact_number: str
-    police_station_id: Optional[int] = None
-    user_id: Optional[int] = None
 
-class OfficerCreate(OfficerBase): pass
-class OfficerUpdate(OfficerBase): pass
+class FIRListResponse(BaseModel):
+    total: int
+    firs: List[FIRResponse]
 
-class CrimeCategoryBase(BaseModel):
-    name: str
-    description: Optional[str] = None
 
-class CrimeCategoryCreate(CrimeCategoryBase): pass
-class CrimeCategoryUpdate(CrimeCategoryBase): pass
-
-class CriminalBase(BaseModel):
+# --- Accused Schemas ---
+class AccusedResponse(BaseModel):
+    id: int
     name: str
     alias: Optional[str] = None
-    address: str
-    phone_number: Optional[str] = None
-    criminal_record: Optional[str] = None
+    age: Optional[int] = None
+    gender: Optional[str] = None
+    risk_score: float
+    is_repeat_offender: bool
+    total_cases: int
+    gang_id: Optional[str] = None
 
-class CriminalCreate(CriminalBase): pass
-class CriminalUpdate(CriminalBase): pass
+    class Config:
+        from_attributes = True
 
-class VictimBase(BaseModel):
-    name: str
-    address: str
-    phone_number: str
 
-class VictimCreate(VictimBase): pass
-class VictimUpdate(VictimBase): pass
+class AccusedProfileResponse(BaseModel):
+    accused: AccusedResponse
+    firs: List[FIRResponse]
+    risk_breakdown: Dict[str, Any]
+    behavioral_profile: str
+    network_connections: List[Dict[str, Any]]
 
-class WitnessBase(BaseModel):
-    name: str
-    address: str
-    phone_number: str
 
-class WitnessCreate(WitnessBase): pass
-class WitnessUpdate(WitnessBase): pass
+# --- Network Schemas ---
+class NetworkNode(BaseModel):
+    id: str
+    label: str
+    type: str  # accused, victim, location, fir
+    properties: Dict[str, Any] = {}
 
-class FIRBase(BaseModel):
-    fir_number: str
-    incident_date: datetime
-    location: str
-    description: str
-    status: FIRStatus = FIRStatus.OPEN
-    category_id: Optional[int] = None
-    officer_id: Optional[int] = None
 
-class FIRCreate(FIRBase): pass
-class FIRUpdate(FIRBase): pass
+class NetworkEdge(BaseModel):
+    source: str
+    target: str
+    relationship: str
+    weight: float = 1.0
 
-class EvidenceBase(BaseModel):
-    fir_id: int
-    type: EvidenceType
-    description: str
-    file_path: Optional[str] = None
 
-class EvidenceCreate(EvidenceBase): pass
-class EvidenceUpdate(EvidenceBase): pass
+class NetworkGraphResponse(BaseModel):
+    nodes: List[NetworkNode]
+    edges: List[NetworkEdge]
+    communities: List[Dict[str, Any]] = []
+    key_players: List[Dict[str, Any]] = []
 
-class InvestigationReportBase(BaseModel):
-    fir_id: int
-    report_content: str
 
-class InvestigationReportCreate(InvestigationReportBase): pass
-class InvestigationReportUpdate(InvestigationReportBase): pass
+# --- Analytics Schemas ---
+class HotspotData(BaseModel):
+    latitude: float
+    longitude: float
+    intensity: float
+    crime_type: str
+    count: int
+    location_name: Optional[str] = None
 
-class AuditLogBase(BaseModel):
-    user_id: int
+
+class CrimeTrendData(BaseModel):
+    date: str
+    count: int
+    crime_type: str
+
+
+class AnalyticsDashboard(BaseModel):
+    total_firs: int
+    active_cases: int
+    closed_cases: int
+    repeat_offenders: int
+    top_crime_types: List[Dict[str, Any]]
+    hotspots: List[HotspotData]
+    trends: List[CrimeTrendData]
+    district_stats: List[Dict[str, Any]]
+
+
+# --- Chat Schemas ---
+class ChatMessage(BaseModel):
+    message: str
+    session_id: Optional[str] = None
+
+
+class ChatResponse(BaseModel):
+    response: str
+    session_id: str
+    intent: Optional[str] = None
+    confidence: float = 0.0
+    data: Optional[Dict[str, Any]] = None
+    sources: List[str] = []
+    suggestions: List[str] = []
+
+
+# --- Risk Score Schema ---
+class RiskScoreBreakdown(BaseModel):
+    total_score: float
+    history_score: float
+    network_score: float
+    mo_escalation_score: float
+    recency_score: float
+    explanation: str
+    factors: List[Dict[str, Any]]
+
+
+# --- Audit Schema ---
+class AuditLogResponse(BaseModel):
+    id: int
+    username: str
     action: str
-    entity_name: str
-    entity_id: Optional[int] = None
     details: Optional[str] = None
+    risk_level: str
+    timestamp: Optional[datetime] = None
+    entry_hash: str
 
-class AuditLogCreate(AuditLogBase): pass
+    class Config:
+        from_attributes = True

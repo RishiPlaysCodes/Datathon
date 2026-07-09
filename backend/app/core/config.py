@@ -1,34 +1,46 @@
-from pydantic_settings import BaseSettings, SettingsConfigDict
+"""Application configuration using pydantic-settings."""
+from pydantic_settings import BaseSettings
 from typing import List
 
+
 class Settings(BaseSettings):
-    PROJECT_NAME: str = "Karnataka State Police AI Crime Investigation System"
-    API_V1_STR: str = "/api/v1"
-    
-    # CORS
-    BACKEND_CORS_ORIGINS: List[str] = ["http://localhost:5173", "http://localhost:3000"]
+    # App
+    APP_NAME: str = "PRAHARI"
+    APP_VERSION: str = "1.0.0"
+    DEBUG: bool = True
+
+    # Server
+    HOST: str = "0.0.0.0"
+    PORT: int = 8001
 
     # Database
-    POSTGRES_SERVER: str = "localhost"
-    POSTGRES_USER: str = "postgres"
-    POSTGRES_PASSWORD: str = "password"
-    POSTGRES_DB: str = "ksp_db"
-    POSTGRES_PORT: str = "5432"
+    DATABASE_URL: str = "postgresql+asyncpg://prahari:prahari123@db:5432/prahari"
+    DATABASE_URL_SYNC: str = "postgresql://prahari:prahari123@db:5432/prahari"
 
-    @property
-    def DATABASE_URL(self) -> str:
-        return f"postgresql+psycopg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_SERVER}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+    # Redis
+    REDIS_URL: str = "redis://redis:6379/0"
 
-    # AI
-    GOOGLE_API_KEY: str = ""
-    CHROMA_HOST: str = "localhost"
-    CHROMA_PORT: int = 8000
-
-    # Auth
-    SECRET_KEY: str = "DEVELOPMENT_SECRET_KEY_REPLACE_IN_PRODUCTION"
+    # JWT
+    SECRET_KEY: str = "prahari-super-secret-key-change-in-production-2026"
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
-    model_config = SettingsConfigDict(case_sensitive=True, env_file=".env")
+    # CORS
+    CORS_ORIGINS: List[str] = [
+        "http://localhost:5174",
+        "http://127.0.0.1:5174",
+        "http://frontend:5174",
+        "http://localhost:3000",
+        "http://localhost:5173",
+    ]
+
+    # Gemini AI
+    GEMINI_API_KEY: str = ""
+
+    class Config:
+        env_file = ".env"
+        case_sensitive = True
+
 
 settings = Settings()
