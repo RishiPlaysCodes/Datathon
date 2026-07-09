@@ -1,0 +1,16 @@
+fastapi
+uvicorn
+langchain
+langchain-google-genai
+chromadb
+psycopg[binary]
+pydantic-settings
+python-dotenv
+sqlmodel
+passlib[bcrypt]
+python-jose[cryptography]
+python-multipart
+alembic
+faker
+email-validator
+pydantic[email]
