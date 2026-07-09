@@ -1,6 +1,11 @@
 """Application configuration using pydantic-settings."""
-from pydantic_settings import BaseSettings
+import os
 from typing import List
+
+try:
+    from pydantic_settings import BaseSettings
+except ImportError:
+    from pydantic import BaseSettings  # type: ignore
 
 
 class Settings(BaseSettings):
@@ -13,12 +18,18 @@ class Settings(BaseSettings):
     HOST: str = "0.0.0.0"
     PORT: int = 8001
 
-    # Database
-    DATABASE_URL: str = "postgresql+asyncpg://prahari:prahari123@db:5432/prahari"
-    DATABASE_URL_SYNC: str = "postgresql://prahari:prahari123@db:5432/prahari"
+    # Database - defaults to SQLite for local dev, PostgreSQL for Docker
+    DATABASE_URL: str = os.environ.get(
+        "DATABASE_URL",
+        "sqlite+aiosqlite:///./prahari.db"
+    )
+    DATABASE_URL_SYNC: str = os.environ.get(
+        "DATABASE_URL_SYNC",
+        "sqlite:///./prahari.db"
+    )
 
-    # Redis
-    REDIS_URL: str = "redis://redis:6379/0"
+    # Redis (optional - works without it)
+    REDIS_URL: str = "redis://localhost:6379/0"
 
     # JWT
     SECRET_KEY: str = "prahari-super-secret-key-change-in-production-2026"
