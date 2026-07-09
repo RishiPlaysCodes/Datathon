@@ -1,7 +1,11 @@
 """Database initialization and seeding script."""
 import asyncio
 import sys
-sys.path.insert(0, "/app")
+import os
+
+# Support both Docker (/app) and local (.) paths
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+sys.path.insert(0, ".")
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.session import engine, async_session, Base
