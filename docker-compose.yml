@@ -1,0 +1,46 @@
+services:
+  db:
+    image: postgres:15-alpine
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=ksp_db
+    ports:
+      - "5432:5432"
+
+  chromadb:
+    image: chromadb/chroma
+    volumes:
+      - chroma_data:/chroma/chroma
+    ports:
+      - "8000:8000"
+
+  backend:
+    build: ./backend
+    volumes:
+      - ./backend:/app
+    environment:
+      - POSTGRES_SERVER=db
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=ksp_db
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - CHROMA_HOST=chromadb
+    depends_on:
+      - db
+      - chromadb
+    ports:
+      - "8001:8000"
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+  chroma_data:
