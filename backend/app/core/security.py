@@ -19,22 +19,45 @@ ROLE_HIERARCHY = {
     "policymaker": 5,
 }
 
+# Try bcrypt (industry standard). Fall back to salted SHA-256 if bcrypt is
+# unavailable or incompatible (e.g. Python 3.14 + passlib issues) so the app
+# still runs everywhere without a hard dependency failure.
+_USE_BCRYPT = False
+try:
+    import bcrypt as _bcrypt
+    # Verify bcrypt actually works on this interpreter
+    _test = _bcrypt.hashpw(b"test", _bcrypt.gensalt(rounds=4))
+    _bcrypt.checkpw(b"test", _test)
+    _USE_BCRYPT = True
+    logger.info("Password hashing: bcrypt (secure)")
+except Exception as e:  # pragma: no cover
+    logger.warning(f"bcrypt unavailable ({e}); using salted SHA-256 fallback")
 
-# --- Password Hashing (works on ALL Python versions) ---
-# Uses SHA256 with salt - compatible everywhere, no bcrypt/passlib dependency issues
 
 def get_password_hash(password: str) -> str:
-    """Hash password using SHA256 with app secret as salt."""
+    if _USE_BCRYPT:
+        # bcrypt max 72 bytes - truncate safely
+        pw = password.encode("utf-8")[:72]
+        return "bcrypt$" + _bcrypt.hashpw(pw, _bcrypt.gensalt()).decode("utf-8")
     salted = f"{settings.SECRET_KEY}:{password}"
-    return hashlib.sha256(salted.encode()).hexdigest()
+    return "sha256$" + hashlib.sha256(salted.encode()).hexdigest()
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verify password against stored hash."""
-    return get_password_hash(plain_password) == hashed_password
+    try:
+        if hashed_password.startswith("bcrypt$") and _USE_BCRYPT:
+            pw = plain_password.encode("utf-8")[:72]
+            return _bcrypt.checkpw(pw, hashed_password[7:].encode("utf-8"))
+        if hashed_password.startswith("sha256$"):
+            salted = f"{settings.SECRET_KEY}:{plain_password}"
+            return hashlib.sha256(salted.encode()).hexdigest() == hashed_password[7:]
+        # Legacy/no-prefix hashes: try sha256 comparison
+        salted = f"{settings.SECRET_KEY}:{plain_password}"
+        return hashlib.sha256(salted.encode()).hexdigest() == hashed_password
+    except Exception as e:
+        logger.error(f"Password verification error: {e}")
+        return False
 
-
-# --- JWT Tokens ---
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     to_encode = data.copy()
@@ -54,18 +77,15 @@ def create_refresh_token(data: dict) -> str:
 
 def decode_token(token: str) -> Optional[dict]:
     try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-        return payload
+        return jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
     except JWTError:
         return None
 
 
 def has_minimum_role(user_role: str, required_role: str) -> bool:
-    """Check if user has at least the required role level."""
     return ROLE_HIERARCHY.get(user_role, 0) >= ROLE_HIERARCHY.get(required_role, 0)
 
 
 def compute_audit_hash(previous_hash: str, action: str, user_id: str, timestamp: str) -> str:
-    """Compute SHA-256 hash for tamper-evident audit trail."""
     data = f"{previous_hash}|{action}|{user_id}|{timestamp}"
     return hashlib.sha256(data.encode()).hexdigest()

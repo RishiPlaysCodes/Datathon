@@ -104,16 +104,48 @@ export const crimeAPI = {
     const { data } = await api.get('/crime/audit-logs', { params })
     return data
   },
+  getCaseSummary: async (firId: number) => {
+    const { data } = await api.get(`/crime/case-summary/${firId}`)
+    return data
+  },
 }
 
 // AI Chat APIs
 export const aiAPI = {
-  chat: async (message: string, sessionId?: string): Promise<ChatResponse> => {
-    const { data } = await api.post('/ai/chat', { message, session_id: sessionId })
+  chat: async (message: string, sessionId?: string, language: string = 'en'): Promise<ChatResponse> => {
+    const { data } = await api.post('/ai/chat', { message, session_id: sessionId, language })
     return data
   },
   getChatHistory: async (sessionId: string) => {
     const { data } = await api.get(`/ai/chat/history/${sessionId}`)
+    return data
+  },
+}
+
+// Analysis APIs (financial, sociological, similar cases, FIR validation, forensics, patrol)
+export const analysisAPI = {
+  getFinancial: async () => {
+    const { data } = await api.get('/analysis/financial')
+    return data
+  },
+  getSociological: async () => {
+    const { data } = await api.get('/analysis/sociological')
+    return data
+  },
+  getSimilarCases: async (firId: number) => {
+    const { data } = await api.get(`/analysis/similar-cases/${firId}`)
+    return data
+  },
+  getPatrol: async () => {
+    const { data } = await api.get('/analysis/patrol')
+    return data
+  },
+  validateFIR: async (payload: { complaint: string; crime_type?: string; location?: string; sections?: string }) => {
+    const { data } = await api.post('/analysis/validate-fir', payload)
+    return data
+  },
+  cyberForensics: async (payload: { complaint: string; attack_type?: string }) => {
+    const { data } = await api.post('/analysis/cyber-forensics', payload)
     return data
   },
 }

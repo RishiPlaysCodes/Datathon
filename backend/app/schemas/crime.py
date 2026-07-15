@@ -110,6 +110,7 @@ class AnalyticsDashboard(BaseModel):
 class ChatMessage(BaseModel):
     message: str
     session_id: Optional[str] = None
+    language: Optional[str] = "en"  # "en" or "kn" (Kannada)
 
 
 class ChatResponse(BaseModel):

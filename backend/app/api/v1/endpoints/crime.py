@@ -431,3 +431,67 @@ async def get_audit_logs(
         }
         for log in logs
     ]
+
+
+
+@router.get("/case-summary/{fir_id}")
+async def get_case_summary(
+    fir_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Generate AI case summary, timeline, and investigation leads for an FIR."""
+    result = await db.execute(select(FIR).where(FIR.id == fir_id))
+    fir = result.scalar_one_or_none()
+    if not fir:
+        raise HTTPException(status_code=404, detail="FIR not found")
+
+    # Linked accused
+    link_result = await db.execute(
+        select(FIRAccusedLink).where(FIRAccusedLink.fir_id == fir_id)
+    )
+    accused_ids = [l.accused_id for l in link_result.scalars().all()]
+    accused_names = []
+    if accused_ids:
+        acc_result = await db.execute(select(Accused).where(Accused.id.in_(accused_ids)))
+        accused_names = [a.name for a in acc_result.scalars().all()]
+
+    # Auto summary
+    date_str = fir.date_of_occurrence.strftime("%d %b %Y") if fir.date_of_occurrence else "unknown date"
+    summary = (
+        f"{fir.crime_type.title()} incident reported at {fir.location_name or fir.district} on {date_str}. "
+        f"{fir.description} Case is currently {fir.status}. "
+        f"{'Accused identified: ' + ', '.join(accused_names) + '. ' if accused_names else 'No accused identified yet. '}"
+        f"{'Under investigation by ' + fir.investigating_officer + '.' if fir.investigating_officer else ''}"
+    )
+
+    # Timeline
+    timeline = [
+        {"action": "FIR Registered", "date": date_str, "completed": True},
+        {"action": "Initial Investigation", "date": "Day 1-2", "completed": True, "note": "Scene visit, witness statements"},
+        {"action": "Evidence Collection", "date": "Day 2-5", "completed": fir.status != "open", "note": "CCTV, forensics, digital evidence"},
+        {"action": "Suspect Identification", "date": "Day 5-10", "completed": len(accused_names) > 0, "note": "Based on MO and network analysis"},
+        {"action": "Arrest / Chargesheet", "date": "Day 10-30", "completed": fir.status == "chargesheeted"},
+    ]
+    if fir.status == "open":
+        timeline.append({"action": "Follow-up Required", "date": "PENDING", "completed": False, "note": "No recent progress - flag for supervisor review"})
+
+    # Leads based on crime type
+    leads = [
+        {"action": f"Check CCTV within 500m of {fir.location_name or 'crime scene'}", "reason": "Primary source for visual identification"},
+        {"action": "Analyze mobile tower dump for the area and time", "reason": f"Identify persons present on {date_str}"},
+    ]
+    ct = (fir.crime_type or "").lower()
+    if "snatch" in ct or "theft" in ct:
+        leads.append({"action": "Check nearby pawn shops and second-hand dealers", "reason": "Similar cases solved via recovered goods"})
+    if "fraud" in ct or "cyber" in ct:
+        leads.append({"action": "Trace UPI IDs and financial transactions", "reason": "Digital trail leads to account holder"})
+    leads.append({"action": "Cross-reference repeat offender database for matching MO", "reason": f"MO: {fir.modus_operandi or 'pattern match'}"})
+
+    return {
+        "fir": FIRResponse.model_validate(fir).model_dump(),
+        "summary": summary,
+        "timeline": timeline,
+        "leads": leads,
+        "accused_names": accused_names,
+    }

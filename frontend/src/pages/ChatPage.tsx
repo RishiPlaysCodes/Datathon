@@ -169,7 +169,7 @@ export function ChatPage() {
     setLoading(true)
 
     try {
-      const response = await aiAPI.chat(messageText, sessionId)
+      const response = await aiAPI.chat(messageText, sessionId, language)
       setSessionId(response.session_id)
 
       const assistantMessage: ChatMessage = {

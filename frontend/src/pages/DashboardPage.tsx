@@ -167,13 +167,13 @@ function StatCard({ icon, label, value, color }: { icon: React.ReactNode; label:
   }
 
   return (
-    <div className={`rounded-xl bg-gradient-to-br ${colors[color as keyof typeof colors]} border p-5`}>
+    <div className={`card-3d rounded-2xl bg-gradient-to-br ${colors[color as keyof typeof colors]} border p-5`}>
       <div className="flex items-center justify-between">
         <div>
           <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">{label}</p>
           <p className="text-3xl font-bold text-white mt-1">{value.toLocaleString()}</p>
         </div>
-        <div className="opacity-60">{icon}</div>
+        <div className="opacity-70 p-2 rounded-xl bg-white/5">{icon}</div>
       </div>
     </div>
   )

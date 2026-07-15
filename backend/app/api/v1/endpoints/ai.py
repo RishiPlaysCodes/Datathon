@@ -97,6 +97,11 @@ async def chat(
             "Search by location",
         ]
 
+    # Apply Kannada translation if requested
+    if getattr(message, "language", "en") == "kn":
+        from app.services.kannada import translate_to_kannada
+        response_text = translate_to_kannada(response_text)
+
     # Save assistant response
     assistant_msg = ConversationHistory(
         user_id=current_user.id,

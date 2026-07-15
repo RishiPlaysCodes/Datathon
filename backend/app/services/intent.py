@@ -142,55 +142,57 @@ def extract_filters(query_lower: str, query_original: str = "") -> Dict[str, Any
                 matched_crime_types.append(crime_type)
                 break
 
+    # Words allowed as modifiers/noise inside a crime phrase (not "unknown")
+    ALLOWED_WORDS = {
+        "all", "the", "recent", "latest", "new", "old", "open", "closed",
+        "active", "pending", "last", "past", "this", "my", "me", "some",
+        "any", "few", "many", "more", "those", "these", "show", "find",
+        "list", "search", "gold", "silver", "mobile", "phone", "bike", "car",
+        "two", "wheeler", "vehicle", "cash", "online", "and", "or", "of", "in",
+        "near", "at", "for", "with", "related", "case", "cases", "fir", "firs",
+        "crime", "crimes", "incident", "incidents",
+    }
+    # Build flat set of all crime keywords for validation
+    _crime_words = set()
+    for _ct, _pats in CRIME_TYPES.items():
+        for _w in _ct.split():
+            _crime_words.add(_w)
+        for _p in _pats:
+            # strip regex chars to get plain keyword stem
+            _crime_words.add(re.sub(r"[.?*+\\]", "", _p).split()[0] if _p else "")
+
+    # Extract the noun phrase from "show X cases" style queries
+    phrase_match = re.search(
+        r"(?:show|find|search|list)?\s*(.+?)\s+(?:cases?|firs?|crimes?|incidents?)",
+        query_lower,
+    )
+
     if len(matched_crime_types) == 1:
-        filters["crime_type"] = matched_crime_types[0]
+        # Verify no unknown qualifier word precedes the crime word
+        unknown_qualifier = None
+        if phrase_match:
+            for w in phrase_match.group(1).split():
+                if (w not in ALLOWED_WORDS and not w.isdigit()
+                        and not any(re.search(p, w) for _c, ps in CRIME_TYPES.items() for p in ps)
+                        and w not in _crime_words):
+                    unknown_qualifier = w
+                    break
+        if unknown_qualifier:
+            filters["unknown_crime_type"] = phrase_match.group(1).strip()
+        else:
+            filters["crime_type"] = matched_crime_types[0]
     elif len(matched_crime_types) > 1:
-        # Multiple crime types detected
         filters["crime_types"] = matched_crime_types
-        filters["crime_type"] = matched_crime_types[0]  # Primary for backward compat
+        filters["crime_type"] = matched_crime_types[0]
     else:
-        # BUG #4 FIX: Check if user mentioned a crime-like word that we don't recognize
-        # Look for patterns like "show X cases" where X is not in our database
-        unknown_crime_match = re.search(
-            r"(?:show|find|search|list)\s+(.+?)\s+(?:cases?|firs?|crimes?|incidents?)",
-            query_lower
-        )
-        if not unknown_crime_match:
-            unknown_crime_match = re.search(
-                r"(.+?)\s+(?:cases?|firs?|crimes?|incidents?)",
-                query_lower
-            )
-
-        if unknown_crime_match:
-            potential_crime = unknown_crime_match.group(1).strip()
-            # Remove common words that aren't crime types
-            noise_words = [
-                "all", "the", "recent", "latest", "new", "old", "open", "closed",
-                "active", "pending", "last", "past", "this", "my", "me", "some",
-                "any", "few", "many", "more", "those", "these",
-            ]
-            # Clean up
-            potential_crime_clean = " ".join(
-                w for w in potential_crime.split()
-                if w not in noise_words and not w.isdigit()
-            )
-
-            if potential_crime_clean and len(potential_crime_clean) > 2:
-                # Check if it's NOT a valid crime type
-                is_valid = False
-                for ct, patterns in CRIME_TYPES.items():
-                    if potential_crime_clean in ct:
-                        is_valid = True
-                        break
-                    for p in patterns:
-                        if re.search(p, potential_crime_clean):
-                            is_valid = True
-                            break
-                    if is_valid:
-                        break
-
-                if not is_valid:
-                    filters["unknown_crime_type"] = potential_crime_clean
+        # No known crime matched - check if user named an unknown "crime"
+        if phrase_match:
+            potential = " ".join(
+                w for w in phrase_match.group(1).split()
+                if w not in ALLOWED_WORDS and not w.isdigit()
+            ).strip()
+            if potential and len(potential) > 2:
+                filters["unknown_crime_type"] = potential
 
     # BUG #1 FIX: Support absolute dates ("after July 2026", "before March 2025", "in 2025")
     # Check for absolute date patterns FIRST
