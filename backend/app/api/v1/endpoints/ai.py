@@ -121,11 +121,41 @@ async def chat(
 async def _handle_fir_search(db: AsyncSession, filters: dict, query: str):
     """Handle FIR search queries."""
     conditions = []
-    date_from = datetime.now() - timedelta(days=filters.get("days", 180))
-    conditions.append(FIR.date_of_occurrence >= date_from)
 
-    if filters.get("crime_type"):
+    # BUG #4 FIX: Check for unknown crime type FIRST
+    if filters.get("unknown_crime_type"):
+        unknown = filters["unknown_crime_type"]
+        from app.services.intent import VALID_CRIME_TYPES
+        valid_list = ", ".join(VALID_CRIME_TYPES)
+        return (
+            f"**Unknown crime type: \"{unknown}\"**\n\n"
+            f"I don't recognize \"{unknown}\" as a valid crime category. "
+            f"Please use one of these:\n\n"
+            f"- {chr(10).join('- ' + ct for ct in VALID_CRIME_TYPES)}\n\n"
+            f"Try rephrasing your query with a valid crime type."
+        ), None, []
+
+    # BUG #1 FIX: Handle absolute dates (after July 2026, before March 2025)
+    if filters.get("has_absolute_date"):
+        if filters.get("date_from"):
+            date_from = datetime.fromisoformat(filters["date_from"])
+            conditions.append(FIR.date_of_occurrence >= date_from)
+        if filters.get("date_to"):
+            date_to = datetime.fromisoformat(filters["date_to"])
+            conditions.append(FIR.date_of_occurrence <= date_to)
+    else:
+        # Relative date (last X days)
+        date_from = datetime.now() - timedelta(days=filters.get("days", 180))
+        conditions.append(FIR.date_of_occurrence >= date_from)
+
+    # BUG #3 FIX: Support multiple crime types
+    if filters.get("crime_types") and len(filters["crime_types"]) > 1:
+        from sqlalchemy import or_
+        crime_conditions = [FIR.crime_type.ilike(f"%{ct}%") for ct in filters["crime_types"]]
+        conditions.append(or_(*crime_conditions))
+    elif filters.get("crime_type"):
         conditions.append(FIR.crime_type.ilike(f"%{filters['crime_type']}%"))
+
     if filters.get("location"):
         conditions.append(
             (FIR.location_name.ilike(f"%{filters['location']}%"))
@@ -165,6 +195,26 @@ async def _handle_fir_search(db: AsyncSession, filters: dict, query: str):
         crime_types[f.crime_type] = crime_types.get(f.crime_type, 0) + 1
 
     response = f"Found **{len(firs)} FIRs** matching your query.\n\n"
+
+    # Show applied filters for transparency
+    applied_filters = []
+    if filters.get("crime_types"):
+        applied_filters.append(f"Crime types: {', '.join(filters['crime_types'])}")
+    elif filters.get("crime_type"):
+        applied_filters.append(f"Crime type: {filters['crime_type']}")
+    if filters.get("location"):
+        applied_filters.append(f"Location: {filters['location']}")
+    if filters.get("has_absolute_date"):
+        if filters.get("date_from"):
+            applied_filters.append(f"From: {filters['date_from'][:10]}")
+        if filters.get("date_to"):
+            applied_filters.append(f"To: {filters['date_to'][:10]}")
+    elif filters.get("days"):
+        applied_filters.append(f"Period: last {filters['days']} days")
+
+    if applied_filters:
+        response += f"**Filters applied:** {' | '.join(applied_filters)}\n\n"
+
     response += "**Crime Type Breakdown:**\n"
     for ct, count in sorted(crime_types.items(), key=lambda x: -x[1]):
         response += f"- {ct}: {count} cases\n"
