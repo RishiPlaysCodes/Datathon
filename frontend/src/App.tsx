@@ -15,6 +15,9 @@ import { ForecastPage } from '@/pages/ForecastPage'
 import { SociologicalPage } from '@/pages/SociologicalPage'
 import { InvestigatorPage } from '@/pages/InvestigatorPage'
 import { FinancialPage } from '@/pages/FinancialPage'
+import { FIRValidatorPage } from '@/pages/FIRValidatorPage'
+import { CyberForensicsPage } from '@/pages/CyberForensicsPage'
+import { PatrolPage } from '@/pages/PatrolPage'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuthStore()
@@ -57,6 +60,9 @@ function App() {
           <Route path="sociological" element={<SociologicalPage />} />
           <Route path="investigator" element={<InvestigatorPage />} />
           <Route path="financial" element={<FinancialPage />} />
+          <Route path="fir-validator" element={<FIRValidatorPage />} />
+          <Route path="cyber-forensics" element={<CyberForensicsPage />} />
+          <Route path="patrol" element={<PatrolPage />} />
           <Route path="audit" element={<AuditPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
