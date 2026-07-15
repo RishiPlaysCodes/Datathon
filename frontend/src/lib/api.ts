@@ -150,4 +150,45 @@ export const analysisAPI = {
   },
 }
 
+// Public Citizen APIs (no auth token needed - uses a separate client)
+const publicClient = axios.create({
+  baseURL: `${API_BASE}/api/v1/public`,
+  headers: { 'Content-Type': 'application/json' },
+})
+
+export const citizenAPI = {
+  fileComplaint: async (payload: any) => {
+    const { data } = await publicClient.post('/complaint', payload)
+    return data
+  },
+  trackComplaint: async (trackingId: string) => {
+    const { data } = await publicClient.get(`/complaint/${trackingId}`)
+    return data
+  },
+  getTransparency: async () => {
+    const { data } = await publicClient.get('/transparency')
+    return data
+  },
+  getSafetyScores: async () => {
+    const { data } = await publicClient.get('/safety-scores')
+    return data
+  },
+  fileCommunityReport: async (payload: any) => {
+    const { data } = await publicClient.post('/community-report', payload)
+    return data
+  },
+  getCommunityReports: async () => {
+    const { data } = await publicClient.get('/community-reports')
+    return data
+  },
+  upvoteReport: async (id: number) => {
+    const { data } = await publicClient.post(`/community-report/${id}/upvote`)
+    return data
+  },
+  sendSOS: async (payload: any) => {
+    const { data } = await publicClient.post('/sos', payload)
+    return data
+  },
+}
+
 export default api

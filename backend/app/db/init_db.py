@@ -10,10 +10,13 @@ sys.path.insert(0, ".")
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.session import engine, async_session, Base
 from app.models.user import User, AuditLog, ConversationHistory
-from app.models.crime import FIR, Accused, Victim, FIRAccusedLink, CriminalNetwork, Transaction
+from app.models.crime import (
+    FIR, Accused, Victim, FIRAccusedLink, CriminalNetwork, Transaction,
+    PublicComplaint, CommunityReport, SOSAlert,
+)
 from app.core.security import get_password_hash, compute_audit_hash
 from app.db.seed import generate_accused, generate_firs, generate_network_links, generate_transactions
-from datetime import datetime
+from datetime import datetime, timedelta
 import random
 
 
@@ -33,9 +36,68 @@ async def init_database():
         await seed_network(db)
         await seed_transactions(db)
         await seed_initial_audit(db)
+        await seed_citizen_data(db)
         await db.commit()
 
     print("Database seeded successfully!")
+
+
+async def seed_citizen_data(db: AsyncSession):
+    """Seed public complaints, community reports, and SOS alerts."""
+    import string
+    localities = ["Koramangala", "Jayanagar", "Indiranagar", "Whitefield", "BTM Layout",
+                  "HSR Layout", "Marathahalli", "Electronic City", "Yelahanka", "Malleswaram"]
+    crime_types = ["theft", "chain snatching", "fraud", "assault", "cyber crime", "vehicle theft"]
+    names = ["Ramesh K", "Sunita R", "Anil Kumar", "Priya S", "Mohan Das", "Kavya M", "Anonymous"]
+
+    statuses = ["submitted", "acknowledged", "fir_registered", "investigating", "resolved", "escalated"]
+    for i in range(25):
+        tid = "KSP-" + "".join(random.choices(string.ascii_uppercase + string.digits, k=6))
+        status = random.choice(statuses)
+        days_ago = random.randint(1, 20)
+        loc = random.choice(localities)
+        is_esc = status == "escalated"
+        complaint = PublicComplaint(
+            tracking_id=tid,
+            complainant_name=random.choice(names),
+            phone=f"9{random.randint(100000000, 999999999)}",
+            crime_type=random.choice(crime_types),
+            description=f"Citizen reported a {random.choice(crime_types)} incident in {loc}.",
+            location_name=loc,
+            district="Bengaluru Urban",
+            station_assigned=f"{loc} PS",
+            status=status,
+            fir_number=f"KSP/BEN/2026/{random.randint(1000,9999)}" if status in ("fir_registered", "investigating", "resolved") else None,
+            is_escalated=is_esc,
+            escalation_reason="No action within 7 days - auto-escalated to DCP office." if is_esc else None,
+            last_action_note="Under review by station house officer." if status == "acknowledged" else "Complaint logged.",
+        )
+        db.add(complaint)
+
+    report_types = [
+        ("suspicious_activity", "Suspicious person loitering near ATM", "high"),
+        ("safety_hazard", "Broken streetlight - dark stretch at night", "medium"),
+        ("suspicious_activity", "Unknown vehicle parked for days", "medium"),
+        ("missing_person", "Elderly man missing since morning", "high"),
+        ("help_request", "Need patrol - frequent eve-teasing near college", "high"),
+        ("safety_hazard", "Open manhole on main road", "medium"),
+        ("suspicious_activity", "Group creating disturbance late night", "medium"),
+    ]
+    for i, (rtype, title, sev) in enumerate(report_types):
+        report = CommunityReport(
+            report_type=rtype, title=title,
+            description=f"{title}. Reported by local resident for community awareness.",
+            location_name=random.choice(localities),
+            reporter_name="Anonymous",
+            is_anonymous=True,
+            status=random.choice(["pending", "verified", "verified"]),
+            upvotes=random.randint(0, 12),
+            severity=sev,
+        )
+        db.add(report)
+
+    await db.flush()
+    print("  Created citizen complaints, community reports")
 
 
 async def seed_users(db: AsyncSession):

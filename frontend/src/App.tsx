@@ -18,6 +18,15 @@ import { FinancialPage } from '@/pages/FinancialPage'
 import { FIRValidatorPage } from '@/pages/FIRValidatorPage'
 import { CyberForensicsPage } from '@/pages/CyberForensicsPage'
 import { PatrolPage } from '@/pages/PatrolPage'
+// Citizen (public) portal
+import { CitizenLayout } from '@/components/layout/CitizenLayout'
+import { CitizenHome } from '@/pages/citizen/CitizenHome'
+import { CitizenReport } from '@/pages/citizen/CitizenReport'
+import { CitizenTrack } from '@/pages/citizen/CitizenTrack'
+import { CitizenSafety } from '@/pages/citizen/CitizenSafety'
+import { CitizenCommunity } from '@/pages/citizen/CitizenCommunity'
+import { CitizenTransparency } from '@/pages/citizen/CitizenTransparency'
+import { CitizenSOS } from '@/pages/citizen/CitizenSOS'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuthStore()
@@ -40,6 +49,18 @@ function App() {
       />
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+
+        {/* Public Citizen Portal - NO login required */}
+        <Route path="/citizen" element={<CitizenLayout />}>
+          <Route index element={<CitizenHome />} />
+          <Route path="report" element={<CitizenReport />} />
+          <Route path="track" element={<CitizenTrack />} />
+          <Route path="safety" element={<CitizenSafety />} />
+          <Route path="community" element={<CitizenCommunity />} />
+          <Route path="transparency" element={<CitizenTransparency />} />
+          <Route path="sos" element={<CitizenSOS />} />
+        </Route>
+
         <Route
           path="/"
           element={

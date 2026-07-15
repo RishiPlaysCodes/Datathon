@@ -98,3 +98,65 @@ class Transaction(Base):
     is_suspicious = Column(Boolean, default=False)
     fir_id = Column(Integer, nullable=True)
     notes = Column(Text, nullable=True)
+
+
+
+class PublicComplaint(Base):
+    """Citizen-filed complaint with public tracking and accountability."""
+    __tablename__ = "public_complaints"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tracking_id = Column(String(20), unique=True, index=True, nullable=False)
+    complainant_name = Column(String(255), nullable=False)
+    phone = Column(String(20), nullable=True)
+    crime_type = Column(String(100), nullable=False)
+    description = Column(Text, nullable=False)
+    location_name = Column(String(255), nullable=True)
+    district = Column(String(100), nullable=True)
+    latitude = Column(Float, nullable=True)
+    longitude = Column(Float, nullable=True)
+    station_assigned = Column(String(255), nullable=True)
+    # submitted, acknowledged, fir_registered, investigating, resolved, escalated
+    status = Column(String(50), default="submitted")
+    fir_number = Column(String(50), nullable=True)  # if converted to FIR
+    is_escalated = Column(Boolean, default=False)
+    escalation_reason = Column(Text, nullable=True)
+    is_anonymous = Column(Boolean, default=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    last_action_note = Column(Text, nullable=True)
+
+
+class CommunityReport(Base):
+    """Citizen community watch report - suspicious activity, hazards, help requests."""
+    __tablename__ = "community_reports"
+
+    id = Column(Integer, primary_key=True, index=True)
+    # suspicious_activity, safety_hazard, missing_person, help_request
+    report_type = Column(String(50), nullable=False)
+    title = Column(String(255), nullable=False)
+    description = Column(Text, nullable=False)
+    location_name = Column(String(255), nullable=True)
+    latitude = Column(Float, nullable=True)
+    longitude = Column(Float, nullable=True)
+    reporter_name = Column(String(255), nullable=True)
+    is_anonymous = Column(Boolean, default=True)
+    status = Column(String(50), default="pending")  # pending, verified, resolved
+    upvotes = Column(Integer, default=0)
+    severity = Column(String(20), default="medium")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class SOSAlert(Base):
+    """Emergency SOS/panic alerts from citizens."""
+    __tablename__ = "sos_alerts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    citizen_name = Column(String(255), nullable=True)
+    phone = Column(String(20), nullable=True)
+    latitude = Column(Float, nullable=True)
+    longitude = Column(Float, nullable=True)
+    location_name = Column(String(255), nullable=True)
+    alert_type = Column(String(50), default="general")  # general, women_safety, medical, accident
+    status = Column(String(50), default="active")  # active, responded, resolved
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
