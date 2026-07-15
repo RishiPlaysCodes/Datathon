@@ -1,15 +1,26 @@
-import { useState, useRef, useEffect } from 'react'
-import { Send, Bot, User, Sparkles, Info } from 'lucide-react'
+import { useState, useRef, useEffect, useCallback } from 'react'
+import { Send, Bot, User, Sparkles, Info, Download, Mic, MicOff, Globe, Volume2 } from 'lucide-react'
 import { aiAPI } from '@/lib/api'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import type { ChatMessage } from '@/types'
 import ReactMarkdown from 'react-markdown'
+import toast from 'react-hot-toast'
+
+// Kannada translations for common UI elements
+const KANNADA_STRINGS: Record<string, string> = {
+  'Ask about crimes, accused, hotspots, networks...': 'ಅಪರಾಧಗಳು, ಆರೋಪಿಗಳು, ಹಾಟ್‌ಸ್ಪಾಟ್‌ಗಳ ಬಗ್ಗೆ ಕೇಳಿ...',
+  'AI Crime Intelligence Chat': 'AI ಅಪರಾಧ ಬುದ್ಧಿಮತ್ತೆ ಚಾಟ್',
+  'Send': 'ಕಳುಹಿಸಿ',
+  'Export PDF': 'PDF ರಫ್ತು',
+  'Voice Input': 'ಧ್ವನಿ ಇನ್‌ಪುಟ್',
+  'Listening...': 'ಆಲಿಸುತ್ತಿದೆ...',
+}
 
 export function ChatPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       role: 'assistant',
-      content: "Namaste! I'm **PRAHARI** - your Crime Intelligence Assistant. I can help you search FIRs, analyze criminal networks, assess risk scores, and identify crime hotspots. Try asking:\n\n- \"Show chain-snatching cases in Koramangala last 6 months\"\n- \"Who are the repeat offenders?\"\n- \"Show criminal network for Ravi Kumar\"\n- \"Crime hotspots in Bangalore\"\n\nWhat would you like to investigate?",
+      content: "Namaste! I'm **PRAHARI** - your Crime Intelligence Assistant. I can help you search FIRs, analyze criminal networks, assess risk scores, and identify crime hotspots.\n\n🎤 **Voice**: Click the mic button to speak your query\n🌐 **Kannada**: Toggle language for Kannada support\n📄 **PDF**: Export your investigation chat anytime\n\nTry asking:\n- \"Show chain-snatching cases in Koramangala last 6 months\"\n- \"Who are the repeat offenders?\"\n- \"Show criminal network for Ravi Kumar\"\n- \"Crime hotspots in Bangalore\"",
       suggestions: [
         "Show recent chain snatching cases",
         "List all repeat offenders",
@@ -21,11 +32,132 @@ export function ChatPage() {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [sessionId, setSessionId] = useState<string | undefined>()
+  const [isListening, setIsListening] = useState(false)
+  const [language, setLanguage] = useState<'en' | 'kn'>('en')
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const recognitionRef = useRef<any>(null)
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  // ========== VOICE INPUT (Web Speech API) ==========
+  const startVoiceInput = useCallback(() => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+    if (!SpeechRecognition) {
+      toast.error('Voice input not supported in this browser. Use Chrome.')
+      return
+    }
+
+    const recognition = new SpeechRecognition()
+    recognition.lang = language === 'kn' ? 'kn-IN' : 'en-IN'
+    recognition.interimResults = true
+    recognition.continuous = false
+
+    recognition.onstart = () => setIsListening(true)
+    recognition.onend = () => setIsListening(false)
+    recognition.onerror = () => {
+      setIsListening(false)
+      toast.error('Voice recognition failed. Try again.')
+    }
+
+    recognition.onresult = (event: any) => {
+      const transcript = Array.from(event.results)
+        .map((result: any) => result[0].transcript)
+        .join('')
+      setInput(transcript)
+
+      // Auto-send when final result
+      if (event.results[0].isFinal) {
+        setTimeout(() => {
+          setInput(transcript)
+        }, 100)
+      }
+    }
+
+    recognition.start()
+    recognitionRef.current = recognition
+  }, [language])
+
+  const stopVoiceInput = useCallback(() => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop()
+      setIsListening(false)
+    }
+  }, [])
+
+  // ========== PDF EXPORT ==========
+  const exportPDF = useCallback(() => {
+    // Generate PDF content as HTML then trigger print/save
+    const content = messages.map((msg, idx) => {
+      const role = msg.role === 'user' ? '👤 Investigator' : '🤖 PRAHARI AI'
+      const time = msg.timestamp || new Date().toLocaleString()
+      return `
+        <div style="margin-bottom: 16px; padding: 12px; border: 1px solid #ddd; border-radius: 8px; ${msg.role === 'user' ? 'background: #f0f7ff;' : 'background: #f9f9f9;'}">
+          <div style="font-weight: bold; color: ${msg.role === 'user' ? '#1d4ed8' : '#059669'}; margin-bottom: 4px;">${role}</div>
+          <div style="font-size: 14px; line-height: 1.6;">${msg.content.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br>')}</div>
+          ${msg.sources && msg.sources.length > 0 ? `<div style="margin-top: 8px; font-size: 11px; color: #666;">Sources: ${msg.sources.join(', ')}</div>` : ''}
+          ${msg.intent ? `<div style="font-size: 11px; color: #888;">Intent: ${msg.intent} | Confidence: ${((msg.confidence || 0) * 100).toFixed(0)}%</div>` : ''}
+        </div>
+      `
+    }).join('')
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>PRAHARI Investigation Report</title>
+        <style>
+          body { font-family: 'Segoe UI', Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 40px; }
+          h1 { color: #1e40af; border-bottom: 2px solid #1e40af; padding-bottom: 10px; }
+          .meta { color: #666; font-size: 12px; margin-bottom: 20px; }
+          .footer { margin-top: 30px; padding-top: 15px; border-top: 1px solid #ddd; font-size: 11px; color: #888; text-align: center; }
+        </style>
+      </head>
+      <body>
+        <h1>🛡️ PRAHARI - Investigation Report</h1>
+        <div class="meta">
+          <p><b>Session ID:</b> ${sessionId || 'N/A'}</p>
+          <p><b>Generated:</b> ${new Date().toLocaleString('en-IN')}</p>
+          <p><b>Messages:</b> ${messages.length}</p>
+          <p><b>Classification:</b> CONFIDENTIAL - For authorized personnel only</p>
+        </div>
+        <h2>Conversation Transcript</h2>
+        ${content}
+        <div class="footer">
+          <p>Generated by PRAHARI Crime Intelligence OS | Karnataka State Police</p>
+          <p>This document contains sensitive information. Handle according to data protection guidelines.</p>
+        </div>
+      </body>
+      </html>
+    `
+
+    const blob = new Blob([html], { type: 'text/html' })
+    const url = URL.createObjectURL(blob)
+    const printWindow = window.open(url, '_blank')
+    if (printWindow) {
+      printWindow.onload = () => {
+        printWindow.print()
+      }
+    } else {
+      // Fallback: download as HTML
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `PRAHARI_Report_${new Date().toISOString().slice(0, 10)}.html`
+      a.click()
+    }
+    URL.revokeObjectURL(url)
+    toast.success('Investigation report exported!')
+  }, [messages, sessionId])
+
+  // ========== TEXT TO SPEECH (Read AI response aloud) ==========
+  const speakText = useCallback((text: string) => {
+    const utterance = new SpeechSynthesisUtterance(text.replace(/\*\*/g, '').replace(/[#\-*]/g, ''))
+    utterance.lang = language === 'kn' ? 'kn-IN' : 'en-IN'
+    utterance.rate = 0.9
+    window.speechSynthesis.speak(utterance)
+    toast.success(language === 'kn' ? 'ಧ್ವನಿ ಪ್ಲೇಬ್ಯಾಕ್...' : 'Playing audio...')
+  }, [language])
 
   const sendMessage = async (text?: string) => {
     const messageText = text || input.trim()
@@ -63,6 +195,8 @@ export function ChatPage() {
     }
   }
 
+  const t = (key: string) => language === 'kn' ? (KANNADA_STRINGS[key] || key) : key
+
   return (
     <div className="flex flex-col h-[calc(100vh-3rem)]">
       {/* Header */}
@@ -70,19 +204,51 @@ export function ChatPage() {
         <div>
           <h1 className="text-xl font-bold text-white flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-primary-400" />
-            AI Crime Intelligence Chat
+            {t('AI Crime Intelligence Chat')}
           </h1>
-          <p className="text-xs text-gray-500 mt-0.5">Natural language queries powered by hybrid NLU + RAG</p>
+          <p className="text-xs text-gray-500 mt-0.5">
+            {language === 'kn' ? 'ಹೈಬ್ರಿಡ್ NLU + RAG ಚಾಲಿತ' : 'Natural language queries • Voice • Kannada • PDF Export'}
+          </p>
         </div>
-        {sessionId && (
-          <span className="text-xs text-gray-600 font-mono">Session: {sessionId.slice(0, 8)}...</span>
-        )}
+        <div className="flex items-center gap-2">
+          {/* Language Toggle */}
+          <button
+            onClick={() => setLanguage(l => l === 'en' ? 'kn' : 'en')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+              language === 'kn'
+                ? 'bg-primary-500/20 text-primary-400 border border-primary-500/30'
+                : 'bg-dark-700 text-gray-400 border border-dark-600'
+            }`}
+            title="Toggle English/Kannada"
+          >
+            <Globe className="w-3.5 h-3.5" />
+            {language === 'kn' ? 'ಕನ್ನಡ' : 'EN'}
+          </button>
+          {/* PDF Export */}
+          <button
+            onClick={exportPDF}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-dark-700 text-gray-400 border border-dark-600 hover:border-green-500/30 hover:text-green-400 transition-all"
+            title="Export conversation as PDF"
+          >
+            <Download className="w-3.5 h-3.5" />
+            PDF
+          </button>
+          {sessionId && (
+            <span className="text-xs text-gray-600 font-mono">ID: {sessionId.slice(0, 8)}</span>
+          )}
+        </div>
       </div>
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto py-4 space-y-4">
         {messages.map((msg, idx) => (
-          <MessageBubble key={idx} message={msg} onSuggestionClick={sendMessage} />
+          <MessageBubble
+            key={idx}
+            message={msg}
+            onSuggestionClick={sendMessage}
+            onSpeak={speakText}
+            language={language}
+          />
         ))}
         {loading && (
           <div className="flex items-start gap-3">
@@ -101,13 +267,27 @@ export function ChatPage() {
       <div className="pt-4 border-t border-dark-700/50">
         <form
           onSubmit={(e) => { e.preventDefault(); sendMessage() }}
-          className="flex items-center gap-3"
+          className="flex items-center gap-2"
         >
+          {/* Voice Button */}
+          <button
+            type="button"
+            onClick={isListening ? stopVoiceInput : startVoiceInput}
+            className={`p-3 rounded-lg transition-all ${
+              isListening
+                ? 'bg-red-500/20 text-red-400 border border-red-500/50 animate-pulse'
+                : 'bg-dark-700 text-gray-400 border border-dark-600 hover:border-primary-500/30 hover:text-primary-400'
+            }`}
+            title={isListening ? 'Stop listening' : 'Start voice input'}
+          >
+            {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+          </button>
+
           <input
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask about crimes, accused, hotspots, networks..."
+            placeholder={isListening ? (language === 'kn' ? 'ಆಲಿಸುತ್ತಿದೆ...' : 'Listening...') : t('Ask about crimes, accused, hotspots, networks...')}
             className="input-field flex-1"
             disabled={loading}
           />
@@ -119,12 +299,22 @@ export function ChatPage() {
             <Send className="w-4 h-4" />
           </button>
         </form>
+        {isListening && (
+          <p className="text-xs text-red-400 mt-1 animate-pulse text-center">
+            🎤 {language === 'kn' ? 'ಧ್ವನಿ ಗುರುತಿಸುವಿಕೆ ಸಕ್ರಿಯ - ಮಾತನಾಡಿ...' : 'Voice recognition active - speak now...'}
+          </p>
+        )}
       </div>
     </div>
   )
 }
 
-function MessageBubble({ message, onSuggestionClick }: { message: ChatMessage; onSuggestionClick: (text: string) => void }) {
+function MessageBubble({ message, onSuggestionClick, onSpeak, language }: {
+  message: ChatMessage
+  onSuggestionClick: (text: string) => void
+  onSpeak: (text: string) => void
+  language: 'en' | 'kn'
+}) {
   const isUser = message.role === 'user'
 
   return (
@@ -145,6 +335,20 @@ function MessageBubble({ message, onSuggestionClick }: { message: ChatMessage; o
             <ReactMarkdown>{message.content}</ReactMarkdown>
           </div>
         </div>
+
+        {/* Action buttons for AI messages */}
+        {!isUser && (
+          <div className="flex items-center gap-2">
+            {/* Speak button */}
+            <button
+              onClick={() => onSpeak(message.content)}
+              className="text-[10px] flex items-center gap-1 px-2 py-0.5 rounded bg-dark-800 text-gray-500 hover:text-primary-400 transition-colors"
+              title="Read aloud"
+            >
+              <Volume2 className="w-3 h-3" /> {language === 'kn' ? 'ಓದು' : 'Listen'}
+            </button>
+          </div>
+        )}
 
         {/* Sources */}
         {message.sources && message.sources.length > 0 && (

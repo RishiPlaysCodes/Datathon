@@ -1,7 +1,8 @@
 import { NavLink } from 'react-router-dom'
 import {
   MessageSquare, LayoutDashboard, Network, Map, Users,
-  Shield, FileText, TrendingUp, LogOut, Activity
+  Shield, FileText, TrendingUp, LogOut, Activity,
+  AlertTriangle, BookOpen, Briefcase, DollarSign
 } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 
@@ -11,8 +12,12 @@ const navItems = [
   { to: '/firs', icon: FileText, label: 'FIR Records' },
   { to: '/network', icon: Network, label: 'Network Graph' },
   { to: '/hotspots', icon: Map, label: 'Hotspot Map' },
-  { to: '/accused', icon: Users, label: 'Accused' },
+  { to: '/accused', icon: Users, label: 'Accused / Profiling' },
   { to: '/analytics', icon: TrendingUp, label: 'Analytics' },
+  { to: '/forecast', icon: AlertTriangle, label: 'Forecast & Alerts' },
+  { to: '/sociological', icon: BookOpen, label: 'Sociological' },
+  { to: '/investigator', icon: Briefcase, label: 'Decision Support' },
+  { to: '/financial', icon: DollarSign, label: 'Financial Crime' },
   { to: '/audit', icon: Shield, label: 'Audit Logs' },
 ]
 
@@ -22,7 +27,7 @@ export function Sidebar() {
   return (
     <aside className="fixed left-0 top-0 h-screen w-64 bg-dark-900 border-r border-dark-700/50 flex flex-col z-50">
       {/* Logo */}
-      <div className="p-6 border-b border-dark-700/50">
+      <div className="p-5 border-b border-dark-700/50">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center">
             <Activity className="w-5 h-5 text-white" />
@@ -35,20 +40,20 @@ export function Sidebar() {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
+      <nav className="flex-1 py-3 px-3 space-y-0.5 overflow-y-auto">
         {navItems.map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}
             to={to}
             className={({ isActive }) =>
-              `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+              `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
                 isActive
                   ? 'bg-primary-600/20 text-primary-400 border border-primary-500/20'
                   : 'text-gray-400 hover:text-gray-200 hover:bg-dark-800'
               }`
             }
           >
-            <Icon className="w-4.5 h-4.5" />
+            <Icon className="w-4 h-4" />
             <span>{label}</span>
           </NavLink>
         ))}
