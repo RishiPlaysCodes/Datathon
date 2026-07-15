@@ -1,0 +1,21 @@
+# PRAHARI - LOCAL development requirements (SQLite, no compilation needed)
+# Use this for running locally on any Python 3.10-3.13.
+# These are all pure-python or have prebuilt wheels - no C compiler required.
+#
+#   pip install -r requirements-local.txt
+#
+# (The full requirements.txt with PostgreSQL/asyncpg is used by Docker only.)
+
+fastapi
+uvicorn[standard]
+sqlalchemy
+aiosqlite
+pydantic
+pydantic-settings
+python-jose[cryptography]
+python-multipart
+rapidfuzz
+networkx
+faker
+bcrypt
+pytest
