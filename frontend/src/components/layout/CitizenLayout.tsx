@@ -1,7 +1,6 @@
 import { NavLink, Outlet, Link } from 'react-router-dom'
-import { Shield, FilePlus, Search, MapPin, Users, TrendingUp, Activity, LogIn } from 'lucide-react'
 import { useState } from 'react'
-import { Menu, X } from 'lucide-react'
+import { Shield, FilePlus, Search, MapPin, Users, TrendingUp, Activity, LogIn, Menu, X } from 'lucide-react'
 
 const navItems = [
   { to: '/citizen', icon: Shield, label: 'Home', end: true },
