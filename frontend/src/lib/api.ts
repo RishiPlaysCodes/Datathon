@@ -19,11 +19,22 @@ api.interceptors.request.use((config) => {
   return config
 })
 
-// Handle 401 responses
+// Lightweight global notifier for network/server errors (debounced to avoid spam)
+let _lastErrorToast = 0
+function notifyApiError(message: string) {
+  const now = Date.now()
+  if (now - _lastErrorToast < 4000) return // debounce: max 1 toast / 4s
+  _lastErrorToast = now
+  import('react-hot-toast').then(({ default: toast }) => toast.error(message)).catch(() => {})
+}
+
+// Handle 401 (auth) + graceful network/server error handling
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
-    if (error.response?.status === 401) {
+    const status = error.response?.status
+
+    if (status === 401) {
       // Try refresh token
       const refreshToken = localStorage.getItem('refresh_token')
       if (refreshToken && !error.config._retry) {
@@ -45,6 +56,13 @@ api.interceptors.response.use(
         localStorage.clear()
         window.location.href = '/login'
       }
+    } else if (!error.response) {
+      // No response = network error / backend down
+      notifyApiError('Cannot reach the server. Is the backend running on port 8001?')
+    } else if (status >= 500) {
+      notifyApiError('Server error. Please try again in a moment.')
+    } else if (status === 403) {
+      notifyApiError('You do not have permission for this action.')
     }
     return Promise.reject(error)
   }
@@ -155,6 +173,19 @@ const publicClient = axios.create({
   baseURL: `${API_BASE}/api/v1/public`,
   headers: { 'Content-Type': 'application/json' },
 })
+
+// Graceful error notification for the public/citizen client too
+publicClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (!error.response) {
+      notifyApiError('Cannot reach the server. Please try again shortly.')
+    } else if (error.response.status >= 500) {
+      notifyApiError('Server error. Please try again in a moment.')
+    }
+    return Promise.reject(error)
+  }
+)
 
 export const citizenAPI = {
   fileComplaint: async (payload: any) => {

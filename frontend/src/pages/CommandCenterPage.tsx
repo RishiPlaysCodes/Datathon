@@ -193,18 +193,54 @@ function StatPill({ icon, label, value, color }: { icon: React.ReactNode; label:
 
 function MiniMap({ hotspots }: { hotspots: any[] }) {
   const ref = useRef<HTMLDivElement>(null)
+  const mapRef = useRef<any>(null)
+
   useEffect(() => {
-    const L = (window as any).L
-    if (!L || !ref.current) return
-    const map = L.map(ref.current, { zoomControl: false, attributionControl: false }).setView([12.9716, 77.5946], 11)
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map)
-    hotspots.forEach(h => {
-      const color = h.count >= 4 ? '#ef4444' : h.count >= 2 ? '#f59e0b' : '#3b82f6'
-      L.circleMarker([h.latitude, h.longitude], { radius: 4 + h.count, fillColor: color, color: color, fillOpacity: 0.6, weight: 1 }).addTo(map)
-    })
-    return () => { map.remove() }
+    let cancelled = false
+    let markers: any[] = []
+
+    const setup = (attempt = 0) => {
+      const L = (window as any).L
+      if (!L) {
+        // Leaflet not loaded yet - retry a few times
+        if (attempt < 20 && !cancelled) setTimeout(() => setup(attempt + 1), 150)
+        return
+      }
+      if (!ref.current || cancelled) return
+
+      // Create map once
+      if (!mapRef.current) {
+        mapRef.current = L.map(ref.current, { zoomControl: false, attributionControl: false })
+          .setView([12.9716, 77.5946], 11)
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+          subdomains: 'abcd', maxZoom: 19,
+        }).addTo(mapRef.current)
+        // Leaflet needs a size recalculation when placed in a flex/grid container
+        setTimeout(() => { try { mapRef.current?.invalidateSize() } catch {} }, 200)
+      }
+
+      // Clear old markers, add new ones
+      markers.forEach(m => { try { mapRef.current.removeLayer(m) } catch {} })
+      markers = []
+      hotspots.forEach(h => {
+        if (h.latitude == null || h.longitude == null) return
+        const color = h.count >= 4 ? '#ef4444' : h.count >= 2 ? '#f59e0b' : '#3b82f6'
+        const marker = L.circleMarker([h.latitude, h.longitude], {
+          radius: 4 + Math.min(h.count, 10), fillColor: color, color, fillOpacity: 0.6, weight: 1,
+        }).addTo(mapRef.current)
+        marker.bindPopup(`<b>${h.location_name || 'Unknown'}</b><br/>${h.crime_type}: ${h.count} cases`)
+        markers.push(marker)
+      })
+    }
+
+    setup()
+    return () => {
+      cancelled = true
+      if (mapRef.current) { try { mapRef.current.remove() } catch {} ; mapRef.current = null }
+    }
   }, [hotspots])
-  return <div ref={ref} className="w-full h-full" style={{ minHeight: '100%' }} />
+
+  return <div ref={ref} className="w-full h-full absolute inset-0" />
 }
 
 function MiniNetwork() {

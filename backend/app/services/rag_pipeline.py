@@ -9,9 +9,11 @@ Uses: sentence-transformers (all-MiniLM-L6-v2) + FAISS (CPU)
 Fallback: TF-IDF if sentence-transformers unavailable
 """
 import logging
-import os
 from typing import List, Dict, Any, Optional
-import numpy as np
+
+# NOTE: numpy is imported lazily inside functions that need it (FAISS path only),
+# so this module imports cleanly even when heavy RAG deps are not installed.
+# This guarantees the app always starts regardless of which extras are present.
 
 logger = logging.getLogger("prahari")
 
@@ -59,7 +61,7 @@ def index_firs(firs: List[Dict[str, Any]]) -> int:
     Call this on startup after DB is seeded.
     Returns number of indexed documents.
     """
-    global _FAISS_INDEX, _FIR_STORE, _TFIDF_VECTORIZER, _TFIDF_MATRIX
+    global _FAISS_INDEX, _FIR_STORE, _TFIDF_VECTORIZER, _TFIDF_MATRIX, _EMBED_TYPE
 
     if not firs:
         return 0
@@ -68,18 +70,29 @@ def index_firs(firs: List[Dict[str, Any]]) -> int:
     texts = [build_fir_text(f) for f in firs]
 
     if _EMBED_TYPE == "sentence_transformer":
-        import faiss
-        embeddings = _EMBED_MODEL.encode(texts, show_progress_bar=False, normalize_embeddings=True)
-        dim = embeddings.shape[1]
-        _FAISS_INDEX = faiss.IndexFlatIP(dim)  # Inner product = cosine for normalized vectors
-        _FAISS_INDEX.add(np.array(embeddings, dtype=np.float32))
-        logger.info(f"RAG: FAISS index built with {len(firs)} FIRs (dim={dim})")
+        try:
+            import faiss
+            import numpy as np
+            embeddings = _EMBED_MODEL.encode(texts, show_progress_bar=False, normalize_embeddings=True)
+            dim = embeddings.shape[1]
+            _FAISS_INDEX = faiss.IndexFlatIP(dim)  # Inner product = cosine for normalized vectors
+            _FAISS_INDEX.add(np.array(embeddings, dtype=np.float32))
+            logger.info(f"RAG: FAISS index built with {len(firs)} FIRs (dim={dim})")
+            return len(firs)
+        except Exception as e:
+            # faiss missing or embedding failed - fall back to TF-IDF
+            logger.warning(f"RAG: FAISS/ST path failed ({e}); falling back to TF-IDF")
+            _EMBED_TYPE = "tfidf"
 
-    elif _EMBED_TYPE == "tfidf":
-        from sklearn.feature_extraction.text import TfidfVectorizer
-        _TFIDF_VECTORIZER = TfidfVectorizer(max_features=5000, stop_words="english")
-        _TFIDF_MATRIX = _TFIDF_VECTORIZER.fit_transform(texts)
-        logger.info(f"RAG: TF-IDF index built with {len(firs)} FIRs")
+    if _EMBED_TYPE == "tfidf":
+        try:
+            from sklearn.feature_extraction.text import TfidfVectorizer
+            _TFIDF_VECTORIZER = TfidfVectorizer(max_features=5000, stop_words="english")
+            _TFIDF_MATRIX = _TFIDF_VECTORIZER.fit_transform(texts)
+            logger.info(f"RAG: TF-IDF index built with {len(firs)} FIRs")
+        except Exception as e:
+            logger.warning(f"RAG: TF-IDF unavailable ({e}); semantic search disabled")
+            _EMBED_TYPE = "none"
 
     return len(firs)
 
@@ -93,7 +106,7 @@ def semantic_search(query: str, top_k: int = 5) -> List[Dict[str, Any]]:
         return []
 
     if _EMBED_TYPE == "sentence_transformer" and _FAISS_INDEX is not None:
-        import faiss
+        import numpy as np
         query_vec = _EMBED_MODEL.encode([query], normalize_embeddings=True)
         scores, indices = _FAISS_INDEX.search(np.array(query_vec, dtype=np.float32), top_k)
         results = []
