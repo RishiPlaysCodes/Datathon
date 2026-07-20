@@ -3,7 +3,7 @@ import {
   MessageSquare, LayoutDashboard, Network, Map, Users,
   Shield, FileText, TrendingUp, LogOut, Activity,
   AlertTriangle, BookOpen, Briefcase, DollarSign, X,
-  Gavel, Fingerprint, Navigation
+  Gavel, Fingerprint, Navigation, Camera, Globe
 } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 
@@ -18,6 +18,8 @@ const navItems = [
   { to: '/analytics', icon: TrendingUp, label: 'Analytics' },
   { to: '/forecast', icon: AlertTriangle, label: 'Forecast & Alerts' },
   { to: '/patrol', icon: Navigation, label: 'Patrol AI' },
+  { to: '/cctv', icon: Camera, label: 'CCTV / IoT' },
+  { to: '/darkweb', icon: Globe, label: 'Dark Web Intel' },
   { to: '/cyber-forensics', icon: Fingerprint, label: 'Cyber Forensics' },
   { to: '/sociological', icon: BookOpen, label: 'Sociological' },
   { to: '/investigator', icon: Briefcase, label: 'Decision Support' },

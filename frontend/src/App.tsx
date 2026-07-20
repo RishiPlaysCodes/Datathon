@@ -18,6 +18,8 @@ import { FinancialPage } from '@/pages/FinancialPage'
 import { FIRValidatorPage } from '@/pages/FIRValidatorPage'
 import { CyberForensicsPage } from '@/pages/CyberForensicsPage'
 import { PatrolPage } from '@/pages/PatrolPage'
+import { CCTVPage } from '@/pages/CCTVPage'
+import { DarkWebPage } from '@/pages/DarkWebPage'
 // Citizen (public) portal
 import { CitizenLayout } from '@/components/layout/CitizenLayout'
 import { CitizenHome } from '@/pages/citizen/CitizenHome'
@@ -84,6 +86,8 @@ function App() {
           <Route path="fir-validator" element={<FIRValidatorPage />} />
           <Route path="cyber-forensics" element={<CyberForensicsPage />} />
           <Route path="patrol" element={<PatrolPage />} />
+          <Route path="cctv" element={<CCTVPage />} />
+          <Route path="darkweb" element={<DarkWebPage />} />
           <Route path="audit" element={<AuditPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/dashboard" replace />} />

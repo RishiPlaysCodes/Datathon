@@ -1,0 +1,14 @@
+{
+  "name": "PRAHARI - Crime Intelligence OS",
+  "short_name": "PRAHARI",
+  "description": "Predictive Relational AI for Holistic Analytics & Response Intelligence",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#020617",
+  "theme_color": "#1e40af",
+  "orientation": "any",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ],
+  "categories": ["government", "security", "utilities"]
+}
