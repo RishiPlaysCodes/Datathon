@@ -4,7 +4,10 @@
 #
 #   pip install -r requirements-local.txt
 #
-# (The full requirements.txt with PostgreSQL/asyncpg is used by Docker only.)
+# For RAG pipeline (optional but recommended):
+#   pip install sentence-transformers faiss-cpu
+#
+# Without those, RAG falls back to TF-IDF (still works, slightly less accurate).
 
 fastapi
 uvicorn[standard]
@@ -19,3 +22,4 @@ networkx
 faker
 bcrypt
 pytest
+scikit-learn

@@ -28,6 +28,31 @@ async def lifespan(app: FastAPI):
     logger.info("=" * 50)
     await init_db()
     logger.info("Database tables ready.")
+
+    # Build RAG index from existing FIRs
+    try:
+        from app.services.rag_pipeline import index_firs
+        from app.db.session import async_session
+        from app.models.crime import FIR
+        from sqlalchemy import select
+
+        async with async_session() as db:
+            result = await db.execute(select(FIR))
+            firs = result.scalars().all()
+            fir_dicts = [
+                {
+                    "id": f.id, "fir_number": f.fir_number, "crime_type": f.crime_type,
+                    "description": f.description, "modus_operandi": f.modus_operandi,
+                    "location_name": f.location_name, "district": f.district,
+                    "status": f.status, "severity": f.severity,
+                }
+                for f in firs
+            ]
+            count = index_firs(fir_dicts)
+            logger.info(f"RAG pipeline: indexed {count} FIRs for semantic search.")
+    except Exception as e:
+        logger.warning(f"RAG index skipped (non-critical): {e}")
+
     logger.info(f"Server running on http://localhost:{settings.PORT}")
     logger.info(f"API docs: http://localhost:{settings.PORT}/docs")
     logger.info("=" * 50)

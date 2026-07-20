@@ -137,13 +137,40 @@ async def get_sociological_analysis(db: AsyncSession) -> Dict[str, Any]:
 
 # ---------------- SIMILAR CASE FINDER ----------------
 async def find_similar_cases(db: AsyncSession, fir_id: int, limit: int = 5) -> Dict[str, Any]:
-    """Find FIRs similar to the given one by crime type, location, and MO."""
+    """Find FIRs similar to the given one - uses RAG semantic search if available, else SQL."""
     result = await db.execute(select(FIR).where(FIR.id == fir_id))
     target = result.scalar_one_or_none()
     if not target:
-        return {"target": None, "similar_cases": []}
+        return {"target": None, "similar_cases": [], "method": "none"}
 
-    # Fetch candidates of same crime type (excluding self)
+    # Try RAG semantic search first
+    try:
+        from app.services.rag_pipeline import semantic_search, get_rag_status
+        status = get_rag_status()
+        if status["indexed"]:
+            query_text = f"{target.crime_type} {target.description} {target.modus_operandi or ''} {target.location_name or ''}"
+            rag_results = semantic_search(query_text, top_k=limit + 1)
+            # Filter out the target itself
+            similar = [r for r in rag_results if r.get("id") != fir_id][:limit]
+            return {
+                "target": {"fir_number": target.fir_number, "crime_type": target.crime_type, "location": target.location_name},
+                "similar_cases": [
+                    {
+                        "id": s.get("id"), "fir_number": s.get("fir_number"),
+                        "crime_type": s.get("crime_type"), "location": s.get("location_name"),
+                        "status": s.get("status"),
+                        "description": (s.get("description") or "")[:120],
+                        "similarity": s.get("similarity_score", 0),
+                        "outcome": "Solved" if s.get("status") in ("closed", "chargesheeted") else "Under investigation",
+                    }
+                    for s in similar
+                ],
+                "method": f"RAG ({status['model']})",
+            }
+    except Exception:
+        pass
+
+    # Fallback: SQL-based matching
     cand_result = await db.execute(
         select(FIR).where(and_(FIR.crime_type == target.crime_type, FIR.id != fir_id)).limit(50)
     )
@@ -172,6 +199,7 @@ async def find_similar_cases(db: AsyncSession, fir_id: int, limit: int = 5) -> D
     return {
         "target": {"fir_number": target.fir_number, "crime_type": target.crime_type, "location": target.location_name},
         "similar_cases": scored[:limit],
+        "method": "SQL (crime_type + location + MO matching)",
     }
 
 

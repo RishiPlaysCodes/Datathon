@@ -48,6 +48,17 @@ async def chat(
 
     if intent == "search_firs":
         response_text, response_data, sources = await _handle_fir_search(db, filters, message.message)
+        # Also run RAG for semantic grounding
+        try:
+            from app.services.rag_pipeline import rag_query as _rag
+            rag_result = _rag(message.message, top_k=3)
+            if rag_result["retrieved_count"] > 0:
+                response_text += f"\n\n---\n**🔍 RAG Semantic Search** ({rag_result['embedding_model']}):\n"
+                for src in rag_result["context_used"][:3]:
+                    response_text += f"  {src}\n"
+                sources.extend(rag_result["sources"][:3])
+        except Exception:
+            pass
         suggestions = [
             "Show me the accused in these cases",
             "Display on hotspot map",
