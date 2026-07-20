@@ -3,7 +3,7 @@ import {
   MessageSquare, LayoutDashboard, Network, Map, Users,
   Shield, FileText, TrendingUp, LogOut, Activity,
   AlertTriangle, BookOpen, Briefcase, DollarSign, X,
-  Gavel, Fingerprint, Navigation, Camera, Globe
+  Gavel, Fingerprint, Navigation, Camera, Globe, ScanFace, Search as SearchIcon
 } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 
@@ -20,6 +20,8 @@ const navItems = [
   { to: '/patrol', icon: Navigation, label: 'Patrol AI' },
   { to: '/cctv', icon: Camera, label: 'CCTV / IoT' },
   { to: '/darkweb', icon: Globe, label: 'Dark Web Intel' },
+  { to: '/deepfake', icon: ScanFace, label: 'Deepfake Detection' },
+  { to: '/osint', icon: SearchIcon, label: 'OSINT Engine' },
   { to: '/cyber-forensics', icon: Fingerprint, label: 'Cyber Forensics' },
   { to: '/sociological', icon: BookOpen, label: 'Sociological' },
   { to: '/investigator', icon: Briefcase, label: 'Decision Support' },

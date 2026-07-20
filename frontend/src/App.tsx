@@ -20,6 +20,8 @@ import { CyberForensicsPage } from '@/pages/CyberForensicsPage'
 import { PatrolPage } from '@/pages/PatrolPage'
 import { CCTVPage } from '@/pages/CCTVPage'
 import { DarkWebPage } from '@/pages/DarkWebPage'
+import { DeepfakePage } from '@/pages/DeepfakePage'
+import { OSINTPage } from '@/pages/OSINTPage'
 // Citizen (public) portal
 import { CitizenLayout } from '@/components/layout/CitizenLayout'
 import { CitizenHome } from '@/pages/citizen/CitizenHome'
@@ -88,6 +90,8 @@ function App() {
           <Route path="patrol" element={<PatrolPage />} />
           <Route path="cctv" element={<CCTVPage />} />
           <Route path="darkweb" element={<DarkWebPage />} />
+          <Route path="deepfake" element={<DeepfakePage />} />
+          <Route path="osint" element={<OSINTPage />} />
           <Route path="audit" element={<AuditPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/dashboard" replace />} />

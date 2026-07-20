@@ -113,3 +113,110 @@ async def get_darkweb_intelligence(user: User = Depends(get_current_user)):
     }
 
     return {"threats": threats, "stats": stats}
+
+
+
+@router.post("/deepfake-analysis")
+async def deepfake_analysis(user: User = Depends(get_current_user)):
+    """
+    Deepfake detection analysis.
+    In production: accepts file upload, runs through AI models.
+    Currently: returns simulated analysis for demo purposes.
+    """
+    import random
+    analyses = [
+        {
+            "file_type": "audio",
+            "verdict": "LIKELY DEEPFAKE",
+            "confidence": 89,
+            "risk": "high",
+            "indicators": [
+                {"name": "Spectral Anomaly", "score": 91, "detail": "Unnatural frequency gaps detected at 4.2kHz-4.8kHz band — typical of voice cloning artifacts"},
+                {"name": "Breathing Pattern", "score": 85, "detail": "No natural breathing pauses detected — AI-generated speech lacks micro-pauses"},
+                {"name": "Background Consistency", "score": 78, "detail": "Background noise profile changes abruptly at 12s mark — splicing detected"},
+                {"name": "Pitch Jitter", "score": 92, "detail": "Pitch variation too uniform — human speech has natural micro-tremors absent here"},
+            ],
+            "models_used": ["WaveFake (CNN)", "RawNet3", "AASIST (Anti-spoofing)"],
+            "recommendation": "HIGH confidence this is AI-generated audio. Do NOT use as evidence without forensic lab confirmation. Recommend: (1) Compare with known voice sample of claimed speaker, (2) Request metadata from source device, (3) Send to FSL for spectrographic analysis.",
+            "case_relevance": "Commonly used in: extortion calls, fake kidnapping demands, impersonation fraud, evidence fabrication",
+        },
+        {
+            "file_type": "video",
+            "verdict": "SUSPICIOUS - NEEDS REVIEW",
+            "confidence": 72,
+            "risk": "medium",
+            "indicators": [
+                {"name": "Face Boundary Artifacts", "score": 68, "detail": "Subtle blending artifacts around jawline inconsistent with natural video"},
+                {"name": "Eye Blink Rate", "score": 75, "detail": "Blink rate of 3/min detected — normal human range is 15-20/min"},
+                {"name": "Lip Sync Score", "score": 61, "detail": "Minor desynchronization between lip movement and audio (40ms lag)"},
+                {"name": "Lighting Consistency", "score": 82, "detail": "Shadow direction on face doesn't match background lighting angle"},
+            ],
+            "models_used": ["FaceForensics++ (XceptionNet)", "LipSync Expert", "HeadPose Estimator"],
+            "recommendation": "MEDIUM confidence of manipulation. Recommend forensic examination. Key checks: (1) Request original uncompressed file, (2) Check EXIF metadata for editing software, (3) Frame-by-frame analysis of face boundaries.",
+            "case_relevance": "Commonly used in: blackmail, fake confessions, political misinformation, identity fraud",
+        },
+    ]
+    return random.choice(analyses)
+
+
+@router.post("/osint-lookup")
+async def osint_lookup(user: User = Depends(get_current_user)):
+    """
+    OSINT (Open Source Intelligence) lookup.
+    Aggregates publicly available information about a subject.
+    """
+    # Simulated OSINT result for demo
+    return {
+        "subject": "Suspect Phone: +91-98XXX-XXXXX",
+        "lookup_sources": ["Truecaller", "Social Media (Public)", "WHOIS", "Company Registrar", "News Archives", "Court Records (Public)"],
+        "findings": [
+            {
+                "source": "Truecaller / NumVerify",
+                "type": "phone_identity",
+                "data": {"name": "Rajesh M", "carrier": "Jio", "location": "Bengaluru", "spam_reports": 47},
+                "confidence": 85,
+            },
+            {
+                "source": "Social Media (Public Profiles)",
+                "type": "social_presence",
+                "data": {
+                    "platforms_found": ["Facebook (Rajesh M. — Bengaluru)", "LinkedIn (Rajesh Murthy — IT Professional)", "Instagram (rajesh_m_blr — private)"],
+                    "activity": "Last active 2 days ago on Facebook",
+                    "connections_of_interest": "Connected to 2 persons flagged in fraud FIRs",
+                },
+                "confidence": 72,
+            },
+            {
+                "source": "Company Registrar (MCA)",
+                "type": "business_links",
+                "data": {
+                    "companies": ["XYZ Solutions Pvt Ltd (Director — incorporated 2024)", "ABC Trading (Partner — struck off 2025)"],
+                    "flags": "One company struck off within 1 year — common in shell company fraud patterns",
+                },
+                "confidence": 90,
+            },
+            {
+                "source": "News Archives",
+                "type": "media_mentions",
+                "data": {
+                    "articles": ["'Online fraud ring busted in Bengaluru' — The Hindu, Mar 2026 (name not directly mentioned but area matches)"],
+                },
+                "confidence": 45,
+            },
+            {
+                "source": "Court Records (eCourts)",
+                "type": "legal_history",
+                "data": {
+                    "cases_found": 2,
+                    "details": ["Case #CC/2024/1234 — Cheating u/s 420 IPC (pending)", "Case #CC/2025/567 — IT Act 66D (acquitted)"],
+                },
+                "confidence": 95,
+            },
+        ],
+        "risk_assessment": {
+            "overall_risk": "HIGH",
+            "score": 78,
+            "summary": "Subject linked to struck-off company, 47 spam reports on phone, pending cheating case, and social connections to known fraud suspects. Recommend: formal investigation, bank account freeze request, and surveillance.",
+        },
+        "legal_note": "All data sourced from publicly available records. No unauthorized access. Compliance: IT Act 2000, DPDPA 2023. For internal investigative use only.",
+    }
