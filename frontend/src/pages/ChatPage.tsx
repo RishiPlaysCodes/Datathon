@@ -362,13 +362,31 @@ function MessageBubble({ message, onSuggestionClick, onSpeak, language }: {
           </div>
         )}
 
-        {/* Confidence */}
+        {/* Confidence + NL2SQL */}
         {message.intent && (
           <div className="flex items-center gap-2 text-[10px] text-gray-600">
             <span>Intent: {message.intent}</span>
             <span>|</span>
             <span>Confidence: {((message.confidence || 0) * 100).toFixed(0)}%</span>
           </div>
+        )}
+
+        {/* NL2SQL Generated Query (Explainability) */}
+        {message.data?.nl2sql && (
+          <details className="mt-1">
+            <summary className="text-[10px] text-primary-400 cursor-pointer hover:text-primary-300 flex items-center gap-1">
+              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg>
+              View Generated SQL (NL2SQL Engine)
+            </summary>
+            <div className="mt-1.5 p-2.5 rounded-lg bg-dark-900/80 border border-dark-700/50 font-mono text-[10px] leading-relaxed">
+              <p className="text-gray-500 mb-1">-- {message.data.nl2sql.explanation}</p>
+              <p className="text-green-400 whitespace-pre-wrap break-all">{message.data.nl2sql.generated_sql}</p>
+              {Object.keys(message.data.nl2sql.parameters || {}).length > 0 && (
+                <p className="text-yellow-400/70 mt-1">-- Params: {JSON.stringify(message.data.nl2sql.parameters)}</p>
+              )}
+              <p className="text-gray-600 mt-1.5 text-[9px]">Tables: {message.data.nl2sql.tables_accessed?.join(', ')} | Template: {message.data.nl2sql.template_used} | {message.data.nl2sql.security_note}</p>
+            </div>
+          </details>
         )}
 
         {/* Suggestions */}

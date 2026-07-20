@@ -41,6 +41,10 @@ async def chat(
     intent = intent_result["intent"]
     filters = intent_result["filters"]
 
+    # Generate SQL (NL2SQL) - shows query transparency
+    from app.services.nl2sql import generate_sql
+    nl2sql_result = generate_sql(intent, filters, message.message)
+
     # Route to appropriate handler
     response_data = None
     sources = []
@@ -128,7 +132,17 @@ async def chat(
         session_id=session_id,
         intent=intent,
         confidence=intent_result.get("confidence", 0.8),
-        data=response_data,
+        data={
+            **(response_data or {}),
+            "nl2sql": {
+                "generated_sql": nl2sql_result["sql"],
+                "parameters": nl2sql_result["parameters"],
+                "explanation": nl2sql_result["explanation"],
+                "tables_accessed": nl2sql_result["tables_accessed"],
+                "template_used": nl2sql_result["template_used"],
+                "security_note": nl2sql_result["security_note"],
+            },
+        } if response_data or nl2sql_result else None,
         sources=sources,
         suggestions=suggestions,
     )
