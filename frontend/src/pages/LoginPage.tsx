@@ -20,7 +20,7 @@ export function LoginPage() {
       const data = await authAPI.login(username, password)
       login(data.user, data.access_token, data.refresh_token)
       toast.success(`Welcome back, ${data.user.full_name}!`)
-      navigate('/dashboard')
+      navigate('/command-center')
     } catch (err: any) {
       toast.error(err.response?.data?.detail || 'Login failed')
     } finally {
@@ -36,7 +36,7 @@ export function LoginPage() {
       const data = await authAPI.login(user, pass)
       login(data.user, data.access_token, data.refresh_token)
       toast.success(`Welcome, ${data.user.full_name}!`)
-      navigate('/dashboard')
+      navigate('/command-center')
     } catch (err: any) {
       toast.error(err.response?.data?.detail || 'Login failed')
     } finally {

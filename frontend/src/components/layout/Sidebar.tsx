@@ -3,11 +3,12 @@ import {
   MessageSquare, LayoutDashboard, Network, Map, Users,
   Shield, FileText, TrendingUp, LogOut, Activity,
   AlertTriangle, BookOpen, Briefcase, DollarSign, X,
-  Gavel, Fingerprint, Navigation, Camera, Globe, ScanFace, Search as SearchIcon
+  Gavel, Fingerprint, Navigation, Camera, Globe, ScanFace, Search as SearchIcon, Zap
 } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 
 const navItems = [
+  { to: '/command-center', icon: Zap, label: 'Command Center' },
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/chat', icon: MessageSquare, label: 'AI Chat' },
   { to: '/firs', icon: FileText, label: 'FIR Records' },

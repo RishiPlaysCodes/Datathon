@@ -4,6 +4,7 @@ import { useAuthStore } from '@/stores/authStore'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { LoginPage } from '@/pages/LoginPage'
 import { DashboardPage } from '@/pages/DashboardPage'
+import { CommandCenterPage } from '@/pages/CommandCenterPage'
 import { ChatPage } from '@/pages/ChatPage'
 import { FIRsPage } from '@/pages/FIRsPage'
 import { NetworkPage } from '@/pages/NetworkPage'
@@ -73,7 +74,8 @@ function App() {
             </ProtectedRoute>
           }
         >
-          <Route index element={<Navigate to="/dashboard" replace />} />
+          <Route index element={<Navigate to="/command-center" replace />} />
+          <Route path="command-center" element={<CommandCenterPage />} />
           <Route path="dashboard" element={<DashboardPage />} />
           <Route path="chat" element={<ChatPage />} />
           <Route path="firs" element={<FIRsPage />} />
