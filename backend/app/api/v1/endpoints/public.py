@@ -49,8 +49,15 @@ class SOSCreate(BaseModel):
 # ---------- Complaint filing + tracking ----------
 @router.post("/complaint")
 async def file_complaint(payload: ComplaintCreate, db: AsyncSession = Depends(get_db)):
-    """Citizen files a complaint online and receives a public tracking ID."""
+    """Citizen files a complaint online and receives a public tracking ID.
+    Also creates a corresponding FIR entry so it's visible in the police system."""
+    from app.models.crime import FIR
+    from datetime import datetime
+    import random
+
     tracking_id = generate_tracking_id()
+    
+    # Create the public complaint record
     complaint = PublicComplaint(
         tracking_id=tracking_id,
         complainant_name="Anonymous" if payload.is_anonymous else payload.complainant_name,
@@ -58,7 +65,7 @@ async def file_complaint(payload: ComplaintCreate, db: AsyncSession = Depends(ge
         crime_type=payload.crime_type,
         description=payload.description,
         location_name=payload.location_name,
-        district=payload.district,
+        district=payload.district or "Bengaluru Urban",
         station_assigned=f"{payload.location_name or payload.district or 'Central'} PS",
         status="submitted",
         is_anonymous=payload.is_anonymous,
@@ -66,10 +73,36 @@ async def file_complaint(payload: ComplaintCreate, db: AsyncSession = Depends(ge
     )
     db.add(complaint)
     await db.flush()
+
+    # ALSO create a corresponding FIR so it appears in the police system
+    fir_number = f"KSP/CIT/{datetime.now().year}/{random.randint(5000,9999)}"
+    fir = FIR(
+        fir_number=fir_number,
+        station_id=f"STN_CIT",
+        station_name=f"{payload.location_name or payload.district or 'Central'} PS",
+        district=payload.district or "Bengaluru Urban",
+        crime_type=payload.crime_type,
+        crime_subtype=payload.crime_type,
+        description=f"[Citizen Online Complaint #{tracking_id}] {payload.description}",
+        date_of_occurrence=datetime.now(),
+        location_name=payload.location_name,
+        status="open",
+        severity="medium",
+        investigating_officer="Pending Assignment",
+    )
+    db.add(fir)
+    await db.flush()
+
+    # Update complaint with FIR number
+    complaint.fir_number = fir_number
+    complaint.status = "fir_registered"
+    complaint.last_action_note = f"FIR #{fir_number} auto-registered in police system."
+
     return {
         "tracking_id": tracking_id,
-        "message": "Complaint filed successfully. Save this tracking ID to check status anytime.",
-        "status": "submitted",
+        "fir_number": fir_number,
+        "message": f"Complaint filed successfully! FIR #{fir_number} has been auto-registered. Save your tracking ID to check status anytime.",
+        "status": "fir_registered",
         "escalation_policy": f"If no action is taken within {ESCALATION_DAYS} days, your complaint is automatically escalated to higher authorities and made publicly visible.",
     }
 

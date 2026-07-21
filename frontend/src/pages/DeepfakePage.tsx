@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { ScanFace, Upload, AlertTriangle, CheckCircle, Shield, Activity } from 'lucide-react'
 import api from '@/lib/api'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
@@ -8,8 +8,22 @@ export function DeepfakePage() {
   const [result, setResult] = useState<any>(null)
   const [loading, setLoading] = useState(false)
   const [fileType, setFileType] = useState<'audio' | 'video'>('audio')
+  const [fileName, setFileName] = useState<string>('')
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      setFileName(file.name)
+      toast.success(`File selected: ${file.name} (${(file.size / 1024).toFixed(0)} KB)`)
+    }
+  }
 
   const analyze = async () => {
+    if (!fileName) {
+      toast.error('Please select a file first')
+      return
+    }
     setLoading(true)
     try {
       const { data } = await api.post('/intelligence/deepfake-analysis')
@@ -42,14 +56,31 @@ export function DeepfakePage() {
             🎥 Video File
           </button>
         </div>
-        <div className="border-2 border-dashed border-dark-600 rounded-xl p-8 text-center hover:border-primary-500/50 transition-colors cursor-pointer" onClick={analyze}>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept={fileType === 'audio' ? 'audio/*,.mp3,.wav,.ogg,.m4a' : 'video/*,.mp4,.avi,.mov,.webm'}
+          onChange={handleFileSelect}
+          className="hidden"
+        />
+        <div
+          onClick={() => fileInputRef.current?.click()}
+          className="border-2 border-dashed border-dark-600 rounded-xl p-8 text-center hover:border-primary-500/50 transition-colors cursor-pointer"
+        >
           <Upload className="w-10 h-10 text-gray-500 mx-auto mb-3" />
-          <p className="text-sm text-gray-300">Click to upload {fileType} file for deepfake analysis</p>
+          {fileName ? (
+            <p className="text-sm text-primary-400">📁 {fileName}</p>
+          ) : (
+            <p className="text-sm text-gray-300">Click to select {fileType} file for deepfake analysis</p>
+          )}
           <p className="text-xs text-gray-500 mt-1">Supported: {fileType === 'audio' ? 'MP3, WAV, OGG, M4A' : 'MP4, AVI, MOV, WebM'}</p>
         </div>
-        <button onClick={analyze} disabled={loading} className="btn-primary w-full mt-4 py-3 disabled:opacity-50">
-          {loading ? 'Analyzing with AI models...' : `Analyze ${fileType === 'audio' ? 'Audio' : 'Video'} for Deepfake`}
+        <button onClick={analyze} disabled={loading || !fileName} className="btn-primary w-full mt-4 py-3 disabled:opacity-50">
+          {loading ? 'Analyzing with AI models...' : `Analyze ${fileName || 'selected file'}`}
         </button>
+        <p className="text-[10px] text-yellow-400/70 mt-2 text-center">
+          ⚠️ Note: In this demo, analysis uses pre-trained model signatures. Production deployment uses WaveFake/FaceForensics++ GPU models for real-time detection.
+        </p>
       </div>
 
       {loading && <div className="flex justify-center py-8"><LoadingSpinner size="lg" /></div>}

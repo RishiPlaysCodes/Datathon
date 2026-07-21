@@ -123,9 +123,16 @@ export function OSINTPage() {
             })}
           </div>
 
-          {/* Legal Note */}
+          {/* Legal Note + Simulation Disclaimer */}
           <div className="glass-card p-4 border-l-4 border-l-primary-500">
             <p className="text-xs text-gray-400">{result.legal_note}</p>
+          </div>
+          <div className="glass-card p-4 border-l-4 border-l-yellow-500">
+            <p className="text-xs text-yellow-400/80">
+              <b>Demo Note:</b> In production, this connects to live APIs (Truecaller, MCA, eCourts, social platforms).
+              Currently showing representative intelligence output to demonstrate the system architecture.
+              Real deployment requires API subscriptions and legal authorization for each data source.
+            </p>
           </div>
         </div>
       )}
