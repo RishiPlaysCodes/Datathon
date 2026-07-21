@@ -39,6 +39,11 @@ async def init_database():
         await seed_citizen_data(db)
         await db.commit()
 
+    # Dispose the engine so the async connection pool closes cleanly.
+    # Without this, the process can hang at exit (aiosqlite/asyncpg keep
+    # background connections alive), making it look "stuck" after seeding.
+    await engine.dispose()
+
     print("Database seeded successfully!")
 
 
