@@ -7,6 +7,8 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 sys.path.insert(0, ".")
 
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.session import engine, async_session, Base
 from app.models.user import User, AuditLog, ConversationHistory
@@ -36,6 +38,35 @@ async def init_database():
         await db.commit()
 
     print("Database seeded successfully!")
+
+
+async def seed_database_if_empty() -> bool:
+    """Seed demo data once without deleting an existing database."""
+    async with async_session() as db:
+        existing_user = await db.execute(select(User.id).limit(1))
+        if existing_user.scalar_one_or_none() is not None:
+            return False
+
+        print("Empty database detected; seeding PRAHARI demo data...")
+        try:
+            await seed_users(db)
+            accused_list = await seed_accused(db)
+            await seed_firs(db, accused_list)
+            await seed_network(db)
+            await seed_transactions(db)
+            await seed_initial_audit(db)
+            await db.commit()
+        except IntegrityError:
+            await db.rollback()
+            # Another AppSail instance may have completed the same first-run seed.
+            existing_user = await db.execute(select(User.id).limit(1))
+            if existing_user.scalar_one_or_none() is not None:
+                print("Demo data was seeded by another application instance.")
+                return False
+            raise
+
+        print("Database seeded successfully!")
+        return True
 
 
 async def seed_users(db: AsyncSession):
