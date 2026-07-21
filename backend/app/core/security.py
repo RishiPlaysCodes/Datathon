@@ -42,6 +42,7 @@ except ImportError:
 
 # Role hierarchy: higher number = more access
 ROLE_HIERARCHY = {
+    "citizen": 0,
     "constable": 1,
     "investigator": 2,
     "analyst": 3,

@@ -118,4 +118,24 @@ export const aiAPI = {
   },
 }
 
+// Deepfake Detection APIs
+export const deepfakeAPI = {
+  detect: async (file: File) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    const { data } = await api.post('/deepfake/detect', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    return data as {
+      filename: string
+      file_size: number
+      is_deepfake: boolean
+      confidence: number
+      risk_level: string
+      analysis_details: Record<string, any>
+      recommendations: string[]
+    }
+  },
+}
+
 export default api

@@ -11,6 +11,7 @@ import { HotspotsPage } from '@/pages/HotspotsPage'
 import { AccusedPage } from '@/pages/AccusedPage'
 import { AnalyticsPage } from '@/pages/AnalyticsPage'
 import { AuditPage } from '@/pages/AuditPage'
+import { DeepfakePage } from '@/pages/DeepfakePage'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuthStore()
@@ -45,6 +46,7 @@ function App() {
           <Route path="dashboard" element={<DashboardPage />} />
           <Route path="chat" element={<ChatPage />} />
           <Route path="firs" element={<FIRsPage />} />
+          <Route path="deepfake" element={<DeepfakePage />} />
           <Route path="network" element={<NetworkPage />} />
           <Route path="hotspots" element={<HotspotsPage />} />
           <Route path="accused" element={<AccusedPage />} />

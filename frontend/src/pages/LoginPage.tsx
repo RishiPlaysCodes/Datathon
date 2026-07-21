@@ -134,6 +134,12 @@ export function LoginPage() {
               >
                 Constable
               </button>
+              <button
+                onClick={() => quickLogin('citizen1', 'citizen123')}
+                className="btn-secondary text-xs py-2 col-span-2 border-yellow-500/30 text-yellow-400"
+              >
+                Citizen (Public User)
+              </button>
             </div>
           </div>
         </div>

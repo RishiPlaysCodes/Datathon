@@ -15,6 +15,7 @@ from app.core.security import get_password_hash, compute_audit_hash
 from app.db.seed import generate_accused, generate_firs, generate_network_links, generate_transactions
 from datetime import datetime
 import random
+import json
 
 
 async def init_database():
@@ -86,6 +87,15 @@ async def seed_users(db: AsyncSession):
             "badge_number": "KSP-DEMO-001",
             "password": "demo123",
         },
+        {
+            "username": "citizen1",
+            "email": "citizen@gmail.com",
+            "full_name": "Ramesh Citizen",
+            "role": "citizen",
+            "station_id": None,
+            "badge_number": None,
+            "password": "citizen123",
+        },
     ]
 
     for user_data in users:
@@ -97,32 +107,62 @@ async def seed_users(db: AsyncSession):
         db.add(user)
 
     await db.flush()
-    print(f"  Created {len(users)} users")
+    print(f"  Created {len(users)} users (including citizen)")
 
 
 async def seed_accused(db: AsyncSession) -> list:
-    """Seed accused persons."""
+    """Seed accused persons with OSINT verification for some."""
     accused_data = generate_accused(40)
     accused_objects = []
 
-    for data in accused_data:
+    # OSINT sources for verified accused
+    osint_sources_pool = [
+        ["Social Media Profiling (Facebook/Instagram)", "Phone Number OSINT (Truecaller)", "Vehicle Registration (Vahan)"],
+        ["Dark Web Monitoring", "Financial Intelligence (FININT)", "Telegram Channel Surveillance"],
+        ["Public Records (Court Orders)", "Address Verification (Google Maps OSINT)", "Associate Network Mapping"],
+        ["Digital Footprint Analysis", "Email OSINT (breach databases)", "Criminal Record Cross-reference"],
+        ["Open Court Records", "Property Registration OSINT", "Mobile Tower Location History"],
+    ]
+
+    for i, data in enumerate(accused_data):
+        # Mark first 10 repeat offenders as OSINT-verified (high-priority targets)
+        if i < 10 and data["is_repeat_offender"]:
+            data["osint_verified"] = True
+            data["osint_sources"] = json.dumps(random.choice(osint_sources_pool))
+        else:
+            data["osint_verified"] = False
+            data["osint_sources"] = None
+
         accused = Accused(**data)
         db.add(accused)
         accused_objects.append(accused)
 
     await db.flush()
-    print(f"  Created {len(accused_objects)} accused persons")
+    print(f"  Created {len(accused_objects)} accused persons (10 OSINT-verified)")
     return accused_objects
 
 
 async def seed_firs(db: AsyncSession, accused_list: list):
-    """Seed FIRs and link to accused."""
+    """Seed FIRs and link to accused. Some FIRs assigned to citizen user."""
     fir_data = generate_firs(220)
+
+    # Citizen user will be user_id 6 (6th user seeded)
+    CITIZEN_USER_ID = 6
+    CITIZEN_NAME = "Ramesh Citizen"
 
     for i, data in enumerate(fir_data):
         # Convert date strings to datetime objects
         data["date_of_occurrence"] = datetime.fromisoformat(data["date_of_occurrence"])
         data.pop("date_of_registration", None)
+
+        # Assign first 5 FIRs to citizen user (their filed complaints)
+        if i < 5:
+            data["complainant_name"] = CITIZEN_NAME
+            data["complainant_user_id"] = CITIZEN_USER_ID
+        else:
+            # Some random FIRs have complainant names but not linked to a user account
+            data["complainant_name"] = f"Complainant {random.choice(['Suresh', 'Kavitha', 'Anil', 'Meena', 'Ramesh'])}"
+            data["complainant_user_id"] = None
 
         fir = FIR(**data)
         db.add(fir)
@@ -156,7 +196,7 @@ async def seed_firs(db: AsyncSession, accused_list: list):
         db.add(victim)
 
     await db.flush()
-    print(f"  Created {len(fir_data)} FIRs with accused links and victims")
+    print(f"  Created {len(fir_data)} FIRs (5 linked to citizen user) with accused links and victims")
 
 
 async def seed_network(db: AsyncSession):

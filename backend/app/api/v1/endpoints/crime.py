@@ -42,11 +42,16 @@ async def list_firs(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """List FIRs with filters."""
+    """List FIRs with filters. Citizens only see their own FIRs."""
     query = select(FIR)
     count_query = select(func.count(FIR.id))
 
     conditions = []
+
+    # CITIZEN ROLE: can only see FIRs they filed (linked by complainant_user_id)
+    if current_user.role == "citizen":
+        conditions.append(FIR.complainant_user_id == current_user.id)
+
     if crime_type:
         conditions.append(FIR.crime_type.ilike(f"%{crime_type}%"))
     if district:
