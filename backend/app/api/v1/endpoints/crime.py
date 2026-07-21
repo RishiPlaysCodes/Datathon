@@ -323,21 +323,23 @@ async def get_analytics_dashboard(
     ]
 
     # Trends (daily counts for last N days)
-    # Use date() for SQLite compatibility (date_trunc is PostgreSQL only)
-    from sqlalchemy import cast, Date
+    # SQLite stores dates as text - use substr to extract YYYY-MM-DD portion
+    # This avoids cast(Date) which breaks on newer SQLAlchemy + SQLite
+    from sqlalchemy import literal_column
     trend_result = await db.execute(
         select(
-            cast(FIR.date_of_occurrence, Date).label("day"),
+            func.substr(FIR.date_of_occurrence, 1, 10).label("day"),
             FIR.crime_type,
             func.count(FIR.id).label("count"),
         )
-        .where(and_(*conditions))
+        .where(and_(*conditions, FIR.date_of_occurrence.isnot(None)))
         .group_by("day", FIR.crime_type)
         .order_by("day")
     )
     trends = [
-        CrimeTrendData(date=str(row[0]), crime_type=row[1], count=row[2])
+        CrimeTrendData(date=str(row[0] or ""), crime_type=row[1], count=row[2])
         for row in trend_result.all()
+        if row[0]  # skip nulls
     ]
 
     # District stats
