@@ -1,11 +1,17 @@
 """Application configuration using pydantic-settings."""
 import os
+import tempfile
 from typing import List
 
 try:
     from pydantic_settings import BaseSettings
 except ImportError:
     from pydantic import BaseSettings  # type: ignore
+
+# Catalyst AppSail restricts writes to the current directory during execution.
+# Use a writable temp directory for the SQLite database so it works both
+# locally and on Catalyst (which allows writes only in the OS temp dir).
+_DB_PATH = os.path.join(tempfile.gettempdir(), "prahari.db")
 
 
 class Settings(BaseSettings):
@@ -18,14 +24,14 @@ class Settings(BaseSettings):
     HOST: str = "0.0.0.0"
     PORT: int = 8001
 
-    # Database - defaults to SQLite for local dev, PostgreSQL for Docker
+    # Database - defaults to SQLite in a writable temp dir (Catalyst-safe)
     DATABASE_URL: str = os.environ.get(
         "DATABASE_URL",
-        "sqlite+aiosqlite:///./prahari.db"
+        f"sqlite+aiosqlite:///{_DB_PATH}"
     )
     DATABASE_URL_SYNC: str = os.environ.get(
         "DATABASE_URL_SYNC",
-        "sqlite:///./prahari.db"
+        f"sqlite:///{_DB_PATH}"
     )
 
     # Redis (optional - works without it)
