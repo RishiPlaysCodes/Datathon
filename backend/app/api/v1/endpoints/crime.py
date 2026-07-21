@@ -328,11 +328,10 @@ async def get_analytics_dashboard(
     ]
 
     # Trends (daily counts for last N days)
-    # Use date() for SQLite compatibility (date_trunc is PostgreSQL only)
-    from sqlalchemy import cast, Date
+    # Use func.date() for SQLite compatibility
     trend_result = await db.execute(
         select(
-            cast(FIR.date_of_occurrence, Date).label("day"),
+            func.date(FIR.date_of_occurrence).label("day"),
             FIR.crime_type,
             func.count(FIR.id).label("count"),
         )
