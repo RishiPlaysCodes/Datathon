@@ -138,6 +138,10 @@ export const aiAPI = {
     const { data } = await api.get(`/ai/chat/history/${sessionId}`)
     return data
   },
+  getStatus: async () => {
+    const { data } = await api.get('/ai/status')
+    return data
+  },
 }
 
 // Analysis APIs (financial, sociological, similar cases, FIR validation, forensics, patrol)

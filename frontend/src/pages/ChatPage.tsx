@@ -34,12 +34,17 @@ export function ChatPage() {
   const [sessionId, setSessionId] = useState<string | undefined>()
   const [isListening, setIsListening] = useState(false)
   const [language, setLanguage] = useState<'en' | 'kn'>('en')
+  const [aiStatus, setAiStatus] = useState<any>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const recognitionRef = useRef<any>(null)
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  useEffect(() => {
+    aiAPI.getStatus().then(setAiStatus).catch(() => {})
+  }, [])
 
   // ========== VOICE INPUT (Web Speech API) ==========
   const startVoiceInput = useCallback(() => {
@@ -206,8 +211,15 @@ export function ChatPage() {
             <Sparkles className="w-5 h-5 text-primary-400" />
             {t('AI Crime Intelligence Chat')}
           </h1>
-          <p className="text-xs text-gray-500 mt-0.5">
-            {language === 'kn' ? 'ಹೈಬ್ರಿಡ್ NLU + RAG ಚಾಲಿತ' : 'Natural language queries • Voice • Kannada • PDF Export'}
+          <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-2">
+            {aiStatus?.llm_active ? (
+              <span className="inline-flex items-center gap-1 text-green-400">
+                <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+                {aiStatus.llm_engine} • Ask in any language (English/Hindi/Kannada)
+              </span>
+            ) : (
+              <span>Rule-based NLU + RAG • Add GEMINI_API_KEY for full conversational AI</span>
+            )}
           </p>
         </div>
         <div className="flex items-center gap-2">

@@ -112,10 +112,48 @@ async def chat(
             "Search by location",
         ]
 
-    # Apply Kannada translation if requested
+    # ===== REAL LLM LAYER (Gemini) - answers anything, any language =====
+    # If a Gemini key is configured, use it to generate a natural, multilingual,
+    # grounded answer. The rule-based response_text becomes the fallback.
+    try:
+        from app.services.llm import is_llm_available, build_grounding_context, generate_answer, suggest_followups
+        if is_llm_available():
+            # Gather DB stats for grounding
+            stats = await _gather_stats(db)
+            # RAG snippets
+            rag_snippets = []
+            try:
+                from app.services.rag_pipeline import semantic_search
+                for r in semantic_search(message.message, top_k=4):
+                    rag_snippets.append(f"{r.get('fir_number')}: {r.get('crime_type')} at "
+                                        f"{r.get('location_name','?')} - {(r.get('description') or '')[:80]}")
+            except Exception:
+                pass
+            # Conversation history for multi-turn context
+            hist_result = await db.execute(
+                select(ConversationHistory)
+                .where(ConversationHistory.session_id == session_id)
+                .order_by(ConversationHistory.timestamp.desc()).limit(6)
+            )
+            history = [{"role": h.role, "content": h.content} for h in reversed(hist_result.scalars().all())]
+
+            context = build_grounding_context(stats, response_data, rag_snippets)
+            llm_answer = generate_answer(message.message, context, history)
+            if llm_answer:
+                response_text = llm_answer
+                llm_suggestions = suggest_followups(message.message, llm_answer)
+                if llm_suggestions:
+                    suggestions = llm_suggestions
+    except Exception as e:
+        pass  # Any LLM failure -> keep rule-based response_text
+
+    # Apply Kannada dictionary translation ONLY as a fallback (when LLM is off
+    # and user explicitly requested Kannada). Gemini handles language natively.
     if getattr(message, "language", "en") == "kn":
-        from app.services.kannada import translate_to_kannada
-        response_text = translate_to_kannada(response_text)
+        from app.services.llm import is_llm_available as _llm_on
+        if not _llm_on():
+            from app.services.kannada import translate_to_kannada
+            response_text = translate_to_kannada(response_text)
 
     # Save assistant response
     assistant_msg = ConversationHistory(
@@ -146,6 +184,28 @@ async def chat(
         sources=sources,
         suggestions=suggestions,
     )
+
+
+async def _gather_stats(db: AsyncSession) -> dict:
+    """Gather compact DB stats to ground the LLM (last 180 days)."""
+    date_from = datetime.now() - timedelta(days=180)
+    total = (await db.execute(select(func.count(FIR.id)).where(FIR.date_of_occurrence >= date_from))).scalar() or 0
+    active = (await db.execute(select(func.count(FIR.id)).where(and_(FIR.date_of_occurrence >= date_from, FIR.status.in_(["open", "investigating"]))))).scalar() or 0
+    closed = (await db.execute(select(func.count(FIR.id)).where(and_(FIR.date_of_occurrence >= date_from, FIR.status == "closed")))).scalar() or 0
+    repeat = (await db.execute(select(func.count(Accused.id)).where(Accused.is_repeat_offender == True))).scalar() or 0
+    types = (await db.execute(
+        select(FIR.crime_type, func.count(FIR.id)).where(FIR.date_of_occurrence >= date_from)
+        .group_by(FIR.crime_type).order_by(func.count(FIR.id).desc()).limit(8)
+    )).all()
+    districts = (await db.execute(
+        select(FIR.district, func.count(FIR.id)).where(FIR.date_of_occurrence >= date_from)
+        .group_by(FIR.district).order_by(func.count(FIR.id).desc()).limit(6)
+    )).all()
+    return {
+        "total_firs": total, "active_cases": active, "closed_cases": closed, "repeat_offenders": repeat,
+        "top_crime_types": [{"crime_type": t[0], "count": t[1]} for t in types],
+        "district_stats": [{"district": d[0], "count": d[1]} for d in districts],
+    }
 
 
 async def _handle_fir_search(db: AsyncSession, filters: dict, query: str):
@@ -498,6 +558,32 @@ async def _handle_general_query(query: str, db: AsyncSession):
         "- Statistics and trends\n\n"
         "Please rephrase your question with specific details."
     )
+
+
+@router.get("/status")
+async def ai_status(current_user: User = Depends(get_current_user)):
+    """Report which AI engine is active (real LLM vs rule-based)."""
+    try:
+        from app.services.llm import is_llm_available
+        llm_on = is_llm_available()
+    except Exception:
+        llm_on = False
+    try:
+        from app.services.rag_pipeline import get_rag_status
+        rag = get_rag_status()
+    except Exception:
+        rag = {"embedding_type": "none", "index_size": 0}
+    return {
+        "llm_engine": "Gemini 1.5 Flash" if llm_on else "Rule-based NLU (add GEMINI_API_KEY for full AI)",
+        "llm_active": llm_on,
+        "multilingual": llm_on,  # Gemini handles any language natively
+        "rag": rag,
+        "capabilities": (
+            ["Free-form Q&A", "Any language (English/Hindi/Kannada/...)", "Grounded in DB", "Multi-turn context"]
+            if llm_on else
+            ["Structured queries", "Intent templates", "Kannada dictionary", "RAG search"]
+        ),
+    }
 
 
 @router.get("/chat/history/{session_id}")
