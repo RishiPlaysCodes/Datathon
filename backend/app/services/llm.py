@@ -17,6 +17,40 @@ logger = logging.getLogger("prahari")
 _GENAI_READY = False
 _MODEL = None
 
+# Preferred models in priority order (newest/fastest first). Model names change
+# over time, so we auto-detect what's actually available for this API key.
+_PREFERRED_MODELS = [
+    "gemini-2.0-flash", "gemini-2.5-flash", "gemini-flash-latest",
+    "gemini-2.0-flash-001", "gemini-1.5-flash-latest", "gemini-1.5-flash",
+    "gemini-2.5-pro", "gemini-pro-latest", "gemini-pro",
+]
+_MODEL_NAME = None
+
+
+def _pick_available_model(genai):
+    """Query the API for models that support generateContent and pick the best."""
+    try:
+        available = []
+        for m in genai.list_models():
+            methods = getattr(m, "supported_generation_methods", []) or []
+            if "generateContent" in methods:
+                available.append(m.name.replace("models/", ""))
+        # Prefer our priority list
+        for pref in _PREFERRED_MODELS:
+            for av in available:
+                if pref == av or pref in av:
+                    return av
+        # Otherwise first available flash model, else first available
+        for av in available:
+            if "flash" in av:
+                return av
+        if available:
+            return available[0]
+    except Exception as e:
+        logger.warning(f"LLM: could not list models ({e}); trying default")
+    return "gemini-2.0-flash"
+
+
 if not settings.GEMINI_API_KEY:
     logger.warning("LLM: No GEMINI_API_KEY found (.env not loaded or key blank) - using rule-based fallback")
 else:
@@ -29,12 +63,12 @@ else:
     if genai is not None:
         try:
             genai.configure(api_key=settings.GEMINI_API_KEY)
-            _MODEL = genai.GenerativeModel("gemini-1.5-flash")
+            _MODEL_NAME = _pick_available_model(genai)
+            _MODEL = genai.GenerativeModel(_MODEL_NAME)
             _GENAI_READY = True
-            logger.info("LLM: Gemini 1.5 Flash READY - full conversational AI enabled (key length="
-                        f"{len(settings.GEMINI_API_KEY)})")
+            logger.info(f"LLM: Gemini READY - model '{_MODEL_NAME}' - full conversational AI enabled")
         except Exception as e:
-            logger.warning(f"LLM: Gemini init failed - key may be invalid ({e}) - using rule-based fallback")
+            logger.warning(f"LLM: Gemini init failed ({e}) - using rule-based fallback")
 
 
 def is_llm_available() -> bool:

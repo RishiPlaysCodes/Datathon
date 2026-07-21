@@ -31,18 +31,29 @@ except ImportError:
     print("    FIX: pip install google-generativeai   then restart backend")
     sys.exit(1)
 
-# 3. Does the key actually work with Gemini?
+# 3. Which models are available for this key, and does a call work?
 if key:
     try:
         genai.configure(api_key=key)
-        model = genai.GenerativeModel("gemini-1.5-flash")
+        # List available models
+        avail = []
+        for m in genai.list_models():
+            methods = getattr(m, "supported_generation_methods", []) or []
+            if "generateContent" in methods:
+                avail.append(m.name.replace("models/", ""))
+        print(f"[3] Available models for your key: {', '.join(avail[:8]) if avail else 'NONE'}")
+
+        # Use the app's own model picker
+        from app.services.llm import _pick_available_model, _MODEL_NAME
+        chosen = _MODEL_NAME or _pick_available_model(genai)
+        model = genai.GenerativeModel(chosen)
         resp = model.generate_content("Reply with exactly: OK")
-        print(f"[3] Gemini API test call: SUCCESS  (model replied: '{(resp.text or '').strip()[:20]}')")
-        print("\n>>> RESULT: Gemini AI is WORKING. Restart the backend and it will answer anything.")
+        print(f"[4] Test call with '{chosen}': SUCCESS  (replied: '{(resp.text or '').strip()[:20]}')")
+        print("\n>>> RESULT: Gemini AI is WORKING. Restart the backend - it will now answer anything.")
     except Exception as e:
-        print(f"[3] Gemini API test call: FAILED  <-- {e}")
-        print("    Likely causes: invalid/expired key, no internet, or region/billing issue.")
-        print("    FIX: Generate a fresh key at https://aistudio.google.com/app/apikey")
+        print(f"[4] Test call: FAILED  <-- {e}")
+        print("    FIX: If it says model not found, the model list above shows valid options.")
+        print("    If it says API key invalid, generate a fresh key at https://aistudio.google.com/app/apikey")
 else:
     print("[3] Skipped (no key).")
 
