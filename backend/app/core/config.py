@@ -1,6 +1,19 @@
 """Application configuration using pydantic-settings."""
 import os
+from pathlib import Path
 from typing import List
+
+# Load .env explicitly BEFORE reading os.environ, so GEMINI_API_KEY and other
+# secrets are picked up reliably no matter which directory uvicorn is run from.
+# python-dotenv ships with pydantic-settings, so it is always available.
+try:
+    from dotenv import load_dotenv
+    # backend/.env  (config.py is at backend/app/core/config.py -> up 2 dirs = backend/)
+    _backend_dir = Path(__file__).resolve().parent.parent.parent
+    load_dotenv(_backend_dir / ".env")
+    load_dotenv()  # also try current working directory as a fallback
+except Exception:
+    pass
 
 try:
     from pydantic_settings import BaseSettings

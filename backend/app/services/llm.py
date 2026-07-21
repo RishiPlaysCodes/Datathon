@@ -17,17 +17,24 @@ logger = logging.getLogger("prahari")
 _GENAI_READY = False
 _MODEL = None
 
-try:
-    if settings.GEMINI_API_KEY:
+if not settings.GEMINI_API_KEY:
+    logger.warning("LLM: No GEMINI_API_KEY found (.env not loaded or key blank) - using rule-based fallback")
+else:
+    try:
         import google.generativeai as genai
-        genai.configure(api_key=settings.GEMINI_API_KEY)
-        _MODEL = genai.GenerativeModel("gemini-1.5-flash")
-        _GENAI_READY = True
-        logger.info("LLM: Gemini 1.5 Flash ready (conversational AI enabled)")
-    else:
-        logger.info("LLM: No GEMINI_API_KEY set - using rule-based fallback")
-except Exception as e:  # pragma: no cover
-    logger.warning(f"LLM: Gemini init failed ({e}) - using rule-based fallback")
+    except ImportError:
+        logger.warning("LLM: GEMINI_API_KEY is set BUT 'google-generativeai' is NOT installed. "
+                       "Run: pip install google-generativeai  -- then restart. Using rule-based fallback for now.")
+        genai = None
+    if genai is not None:
+        try:
+            genai.configure(api_key=settings.GEMINI_API_KEY)
+            _MODEL = genai.GenerativeModel("gemini-1.5-flash")
+            _GENAI_READY = True
+            logger.info("LLM: Gemini 1.5 Flash READY - full conversational AI enabled (key length="
+                        f"{len(settings.GEMINI_API_KEY)})")
+        except Exception as e:
+            logger.warning(f"LLM: Gemini init failed - key may be invalid ({e}) - using rule-based fallback")
 
 
 def is_llm_available() -> bool:
