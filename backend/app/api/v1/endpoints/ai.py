@@ -605,9 +605,12 @@ async def _handle_general_query(query: str, db: AsyncSession):
 @router.get("/status")
 async def ai_status(current_user: User = Depends(get_current_user)):
     """Report which AI engine is active (real LLM vs rule-based)."""
+    llm_model = None
     try:
         from app.services.llm import is_llm_available
+        from app.services import llm as _llm_mod
         llm_on = is_llm_available()
+        llm_model = getattr(_llm_mod, "_MODEL_NAME", None)
     except Exception:
         llm_on = False
     try:
@@ -616,7 +619,7 @@ async def ai_status(current_user: User = Depends(get_current_user)):
     except Exception:
         rag = {"embedding_type": "none", "index_size": 0}
     return {
-        "llm_engine": "Gemini 1.5 Flash" if llm_on else "Rule-based NLU (add GEMINI_API_KEY for full AI)",
+        "llm_engine": (f"Gemini ({llm_model})" if llm_model else "Gemini") if llm_on else "Rule-based NLU (add GEMINI_API_KEY for full AI)",
         "llm_active": llm_on,
         "multilingual": llm_on,  # Gemini handles any language natively
         "rag": rag,

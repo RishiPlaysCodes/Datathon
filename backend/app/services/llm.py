@@ -51,6 +51,32 @@ def _pick_available_model(genai):
     return "gemini-2.0-flash"
 
 
+def _ordered_candidates(genai):
+    """Return candidate models that support generateContent, best first."""
+    available = []
+    try:
+        for m in genai.list_models():
+            methods = getattr(m, "supported_generation_methods", []) or []
+            if "generateContent" in methods:
+                available.append(m.name.replace("models/", ""))
+    except Exception as e:
+        logger.warning(f"LLM: list_models failed ({e})")
+    # Order: preferred names first (that are available), then any flash, then rest
+    ordered = []
+    for pref in _PREFERRED_MODELS:
+        for av in available:
+            if (pref == av or pref in av) and av not in ordered:
+                ordered.append(av)
+    for av in available:
+        if "flash" in av and av not in ordered:
+            ordered.append(av)
+    for av in available:
+        if av not in ordered:
+            ordered.append(av)
+    # If list_models returned nothing, fall back to hardcoded guesses
+    return ordered or _PREFERRED_MODELS
+
+
 if not settings.GEMINI_API_KEY:
     logger.warning("LLM: No GEMINI_API_KEY found (.env not loaded or key blank) - using rule-based fallback")
 else:
@@ -63,10 +89,21 @@ else:
     if genai is not None:
         try:
             genai.configure(api_key=settings.GEMINI_API_KEY)
-            _MODEL_NAME = _pick_available_model(genai)
-            _MODEL = genai.GenerativeModel(_MODEL_NAME)
-            _GENAI_READY = True
-            logger.info(f"LLM: Gemini READY - model '{_MODEL_NAME}' - full conversational AI enabled")
+            # Try each candidate with a REAL test call - only lock in one that actually works.
+            # (Creating GenerativeModel doesn't validate; only generate_content does.)
+            for cand in _ordered_candidates(genai):
+                try:
+                    test_model = genai.GenerativeModel(cand)
+                    test_model.generate_content("ping")
+                    _MODEL = test_model
+                    _MODEL_NAME = cand
+                    _GENAI_READY = True
+                    logger.info(f"LLM: Gemini READY - verified working model '{cand}'")
+                    break
+                except Exception as ce:
+                    logger.info(f"LLM: model '{cand}' not usable ({str(ce)[:80]}); trying next")
+            if not _GENAI_READY:
+                logger.warning("LLM: No usable Gemini model for this key - using rule-based fallback")
         except Exception as e:
             logger.warning(f"LLM: Gemini init failed ({e}) - using rule-based fallback")
 
