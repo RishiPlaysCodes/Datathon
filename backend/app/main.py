@@ -112,3 +112,46 @@ async def root():
 @app.get("/health")
 async def health():
     return {"status": "healthy", "service": "prahari-backend"}
+
+
+@app.get("/api/v1/status")
+async def diagnostic_status():
+    """Public diagnostic endpoint - verify DB is seeded and reachable (no auth)."""
+    from sqlalchemy import select, func
+    from app.db.session import async_session
+    from app.models.user import User
+    from app.models.crime import FIR, Accused
+
+    info = {"backend": "operational", "db_path": settings.DATABASE_URL}
+    try:
+        async with async_session() as db:
+            users = (await db.execute(select(func.count(User.id)))).scalar() or 0
+            firs = (await db.execute(select(func.count(FIR.id)))).scalar() or 0
+            accused = (await db.execute(select(func.count(Accused.id)))).scalar() or 0
+
+            # Self-heal: if empty, seed now
+            if users == 0:
+                from app.db.init_db import (
+                    seed_users, seed_accused, seed_firs,
+                    seed_network, seed_transactions, seed_initial_audit,
+                )
+                await seed_users(db)
+                accused_list = await seed_accused(db)
+                await seed_firs(db, accused_list)
+                await seed_network(db)
+                await seed_transactions(db)
+                await seed_initial_audit(db)
+                await db.commit()
+                users = (await db.execute(select(func.count(User.id)))).scalar() or 0
+                firs = (await db.execute(select(func.count(FIR.id)))).scalar() or 0
+                accused = (await db.execute(select(func.count(Accused.id)))).scalar() or 0
+                info["seeded_now"] = True
+
+            info["users"] = users
+            info["firs"] = firs
+            info["accused"] = accused
+            info["db_ready"] = users > 0
+    except Exception as e:
+        info["error"] = str(e)
+        info["db_ready"] = False
+    return info
