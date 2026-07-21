@@ -1,7 +1,16 @@
 import axios from 'axios'
 import type { TokenResponse, Dashboard, FIR, Accused, NetworkGraph, HotspotData, ChatResponse } from '@/types'
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8001'
+// Resolve the backend base URL robustly:
+// 1. Use VITE_API_URL if provided at build time.
+// 2. On localhost, use the local backend.
+// 3. On any deployed host (Catalyst), use the production backend URL.
+const PROD_BACKEND = 'https://prahari-final-50044229424.catalystappsail.in'
+const _envUrl = import.meta.env.VITE_API_URL
+const _isLocalhost =
+  typeof window !== 'undefined' &&
+  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+const API_BASE = _envUrl || (_isLocalhost ? 'http://localhost:8001' : PROD_BACKEND)
 
 const api = axios.create({
   baseURL: `${API_BASE}/api/v1`,
