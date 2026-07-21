@@ -6,8 +6,8 @@ import {
 import { useAuthStore } from '@/stores/authStore'
 
 const allNavItems = [
-  { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', minRole: 'citizen' },
-  { to: '/chat', icon: MessageSquare, label: 'AI Chat', minRole: 'citizen' },
+  { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', minRole: 'constable' },
+  { to: '/chat', icon: MessageSquare, label: 'AI Chat', minRole: 'constable' },
   { to: '/firs', icon: FileText, label: 'FIR Records', minRole: 'citizen' },
   { to: '/deepfake', icon: ScanSearch, label: 'Deepfake Detect', minRole: 'citizen' },
   { to: '/network', icon: Network, label: 'Network Graph', minRole: 'constable' },
@@ -26,7 +26,7 @@ const ROLE_LEVEL: Record<string, number> = {
   policymaker: 5,
 }
 
-export function Sidebar() {
+export function Sidebar({ mobileOpen, onNavigate }: { mobileOpen: boolean; onNavigate: () => void }) {
   const { user, logout } = useAuthStore()
   const userLevel = ROLE_LEVEL[user?.role || 'citizen'] ?? 0
 
@@ -35,7 +35,7 @@ export function Sidebar() {
   )
 
   return (
-    <aside className="fixed left-0 top-0 h-screen w-64 bg-dark-900 border-r border-dark-700/50 flex flex-col z-50">
+    <aside className={`fixed left-0 top-0 z-50 flex h-screen w-64 flex-col border-r border-dark-700/50 bg-dark-900 transition-transform md:translate-x-0 ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
       {/* Logo */}
       <div className="p-6 border-b border-dark-700/50">
         <div className="flex items-center gap-3">
@@ -55,6 +55,7 @@ export function Sidebar() {
           <NavLink
             key={to}
             to={to}
+            onClick={onNavigate}
             className={({ isActive }) =>
               `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
                 isActive
@@ -81,7 +82,10 @@ export function Sidebar() {
           </div>
         </div>
         <button
-          onClick={logout}
+          onClick={() => {
+            logout()
+            onNavigate()
+          }}
           className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm text-gray-400 hover:text-red-400 hover:bg-red-500/10 transition-all"
         >
           <LogOut className="w-4 h-4" />

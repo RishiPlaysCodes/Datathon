@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import { deepfakeAPI } from '@/lib/api'
+import { deepfakeAPI, getApiErrorMessage } from '@/lib/api'
 import { ScanSearch, Upload, AlertTriangle, CheckCircle, Shield, FileWarning, X, Loader2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -20,14 +20,19 @@ export function DeepfakePage() {
   const [result, setResult] = useState<DeepfakeResult | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selected = e.target.files?.[0]
-    if (!selected) return
-
-    // Validate
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'video/mp4', 'video/avi', 'video/quicktime']
-    if (!allowedTypes.some(t => selected.type.startsWith(t.split('/')[0]))) {
-      toast.error('Please upload an image or video file')
+  const processFile = (selected: File) => {
+    const extension = selected.name.includes('.')
+      ? `.${selected.name.split('.').pop()?.toLowerCase()}`
+      : ''
+    const allowedExtensions = new Set([
+      '.jpg', '.jpeg', '.png', '.gif', '.webp', '.mp4', '.avi', '.mov', '.mkv',
+    ])
+    if (!allowedExtensions.has(extension)) {
+      toast.error('Unsupported file type. Upload JPG, PNG, GIF, WebP, MP4, AVI, MOV, or MKV.')
+      return
+    }
+    if (selected.size === 0) {
+      toast.error('The selected file is empty')
       return
     }
     if (selected.size > 50 * 1024 * 1024) {
@@ -37,8 +42,6 @@ export function DeepfakePage() {
 
     setFile(selected)
     setResult(null)
-
-    // Create preview for images
     if (selected.type.startsWith('image/')) {
       const reader = new FileReader()
       reader.onload = () => setPreview(reader.result as string)
@@ -48,28 +51,15 @@ export function DeepfakePage() {
     }
   }
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selected = e.target.files?.[0]
+    if (selected) processFile(selected)
+  }
+
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault()
     const dropped = e.dataTransfer.files[0]
-    if (dropped) {
-      const input = fileInputRef.current
-      if (input) {
-        const dt = new DataTransfer()
-        dt.items.add(dropped)
-        input.files = dt.files
-        input.dispatchEvent(new Event('change', { bubbles: true }))
-      }
-      // Manual handling
-      setFile(dropped)
-      setResult(null)
-      if (dropped.type.startsWith('image/')) {
-        const reader = new FileReader()
-        reader.onload = () => setPreview(reader.result as string)
-        reader.readAsDataURL(dropped)
-      } else {
-        setPreview(null)
-      }
-    }
+    if (dropped) processFile(dropped)
   }
 
   const handleAnalyze = async () => {
@@ -85,7 +75,7 @@ export function DeepfakePage() {
         toast.success('Media appears authentic', { icon: '✅' })
       }
     } catch (err: any) {
-      toast.error(err.response?.data?.detail || 'Analysis failed')
+      toast.error(getApiErrorMessage(err, 'Analysis failed'))
     } finally {
       setLoading(false)
     }

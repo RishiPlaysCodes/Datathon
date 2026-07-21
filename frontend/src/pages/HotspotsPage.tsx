@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import L from 'leaflet'
+import 'leaflet/dist/leaflet.css'
 import { crimeAPI } from '@/lib/api'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { Map, Filter, AlertTriangle } from 'lucide-react'
@@ -8,7 +10,7 @@ export function HotspotsPage() {
   const [crimeType, setCrimeType] = useState('')
   const [days, setDays] = useState(90)
   const mapRef = useRef<HTMLDivElement>(null)
-  const mapInstanceRef = useRef<any>(null)
+  const mapInstanceRef = useRef<L.Map | null>(null)
 
   const { data: hotspots, isLoading } = useQuery({
     queryKey: ['hotspots', crimeType, days],
@@ -21,67 +23,46 @@ export function HotspotsPage() {
   useEffect(() => {
     if (!mapRef.current || !hotspots || hotspots.length === 0) return
 
-    // Load Leaflet dynamically
-    const initMap = async () => {
-      const L = (window as any).L
-      if (!L) {
-        // Load leaflet script
-        const script = document.createElement('script')
-        script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
-        script.onload = () => setTimeout(() => renderMap((window as any).L), 100)
-        document.head.appendChild(script)
-      } else {
-        renderMap(L)
-      }
+    if (mapInstanceRef.current) {
+      mapInstanceRef.current.remove()
     }
 
-    const renderMap = (L: any) => {
-      if (mapInstanceRef.current) {
-        mapInstanceRef.current.remove()
-      }
+    const map = L.map(mapRef.current).setView([12.9716, 77.5946], 12)
+    mapInstanceRef.current = map
 
-      const map = L.map(mapRef.current).setView([12.9716, 77.5946], 12)
-      mapInstanceRef.current = map
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors',
+    }).addTo(map)
 
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap contributors',
-      }).addTo(map)
+    hotspots.forEach((spot) => {
+      const color = spot.count >= 5 ? '#ef4444' : spot.count >= 3 ? '#f59e0b' : '#3b82f6'
+      const radius = Math.max(200, spot.count * 150)
 
-      // Add markers with circles for hotspots
-      hotspots.forEach((spot) => {
-        const color = spot.count >= 5 ? '#ef4444' : spot.count >= 3 ? '#f59e0b' : '#3b82f6'
-        const radius = Math.max(200, spot.count * 150)
-
-        L.circle([spot.latitude, spot.longitude], {
-          color,
-          fillColor: color,
-          fillOpacity: 0.3,
-          radius,
-        })
-          .addTo(map)
-          .bindPopup(
-            `<b>${spot.location_name || 'Unknown'}</b><br/>
-             Crime: ${spot.crime_type}<br/>
-             Cases: ${spot.count}`
-          )
-
-        L.circleMarker([spot.latitude, spot.longitude], {
-          radius: 6,
-          fillColor: color,
-          color: '#fff',
-          weight: 1,
-          fillOpacity: 0.9,
-        }).addTo(map)
+      L.circle([spot.latitude, spot.longitude], {
+        color,
+        fillColor: color,
+        fillOpacity: 0.3,
+        radius,
       })
-    }
+        .addTo(map)
+        .bindPopup(
+          `<b>${spot.location_name || 'Unknown'}</b><br/>
+           Crime: ${spot.crime_type}<br/>
+           Cases: ${spot.count}`
+        )
 
-    initMap()
+      L.circleMarker([spot.latitude, spot.longitude], {
+        radius: 6,
+        fillColor: color,
+        color: '#fff',
+        weight: 1,
+        fillOpacity: 0.9,
+      }).addTo(map)
+    })
 
     return () => {
-      if (mapInstanceRef.current) {
-        mapInstanceRef.current.remove()
-        mapInstanceRef.current = null
-      }
+      map.remove()
+      if (mapInstanceRef.current === map) mapInstanceRef.current = null
     }
   }, [hotspots])
 

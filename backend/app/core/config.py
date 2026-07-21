@@ -11,7 +11,9 @@ except ImportError:
 # Catalyst AppSail restricts writes to the current directory during execution.
 # Use a writable temp directory for the SQLite database so it works both
 # locally and on Catalyst (which allows writes only in the OS temp dir).
-_DB_PATH = os.path.join(tempfile.gettempdir(), "prahari.db")
+# Version the ephemeral demo database so deployments created before the citizen
+# and OSINT columns cannot be reused with an incompatible SQLite schema.
+_DB_PATH = os.path.join(tempfile.gettempdir(), "prahari_v2.db")
 
 
 class Settings(BaseSettings):

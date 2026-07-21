@@ -35,14 +35,17 @@ async def register(user_data: UserCreate, db: AsyncSession = Depends(get_db)):
             detail="Username or email already registered",
         )
 
+    # Self-registration is public, so it must never allow callers to grant
+    # themselves police or supervisor privileges. Administrative user creation
+    # belongs behind a separate supervisor-only endpoint.
     user = User(
         username=user_data.username,
         email=user_data.email,
         hashed_password=get_password_hash(user_data.password),
         full_name=user_data.full_name,
-        role=user_data.role,
-        station_id=user_data.station_id,
-        badge_number=user_data.badge_number,
+        role="citizen",
+        station_id=None,
+        badge_number=None,
     )
     db.add(user)
     await db.flush()
@@ -113,8 +116,11 @@ async def refresh_token(token_data: TokenRefresh, db: AsyncSession = Depends(get
     result = await db.execute(select(User).where(User.username == username))
     user = result.scalar_one_or_none()
 
-    if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    if not user or not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found or inactive",
+        )
 
     access_token = create_access_token(data={"sub": user.username, "role": user.role})
     new_refresh = create_refresh_token(data={"sub": user.username})

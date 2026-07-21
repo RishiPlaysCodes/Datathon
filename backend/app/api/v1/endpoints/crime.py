@@ -61,9 +61,15 @@ async def list_firs(
     if location:
         conditions.append(FIR.location_name.ilike(f"%{location}%"))
     if date_from:
-        conditions.append(FIR.date_of_occurrence >= datetime.fromisoformat(date_from))
+        try:
+            conditions.append(FIR.date_of_occurrence >= datetime.fromisoformat(date_from))
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="date_from must be a valid ISO-8601 date") from exc
     if date_to:
-        conditions.append(FIR.date_of_occurrence <= datetime.fromisoformat(date_to))
+        try:
+            conditions.append(FIR.date_of_occurrence <= datetime.fromisoformat(date_to))
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="date_to must be a valid ISO-8601 date") from exc
     if search:
         conditions.append(
             (FIR.description.ilike(f"%{search}%"))
@@ -102,6 +108,8 @@ async def get_fir(
     fir = result.scalar_one_or_none()
     if not fir:
         raise HTTPException(status_code=404, detail="FIR not found")
+    if current_user.role == "citizen" and fir.complainant_user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="You can only access FIRs filed by your account")
     return FIRResponse.model_validate(fir)
 
 
@@ -111,7 +119,7 @@ async def list_accused(
     repeat_only: bool = False,
     min_risk: Optional[float] = None,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_role("constable")),
 ):
     """List accused persons."""
     query = select(Accused)
@@ -139,7 +147,7 @@ async def list_accused(
 async def get_accused_profile(
     accused_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_role("constable")),
 ):
     """Get full accused profile with risk score breakdown."""
     result = await db.execute(select(Accused).where(Accused.id == accused_id))
@@ -232,7 +240,7 @@ async def get_criminal_network(
     accused_id: int,
     depth: int = Query(2, ge=1, le=4),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_role("constable")),
 ):
     """Get criminal network graph for an accused person."""
     return await build_network_graph(db, accused_id, depth)
@@ -242,7 +250,7 @@ async def get_criminal_network(
 async def resolve_entity(
     name: str,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_role("constable")),
 ):
     """Resolve entity - find matching accused across name variants."""
     return await get_entity_resolution(db, name)
@@ -253,7 +261,7 @@ async def get_analytics_dashboard(
     district: Optional[str] = None,
     days: int = Query(90, ge=7, le=365),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_role("constable")),
 ):
     """Get analytics dashboard data."""
     date_from = datetime.now() - timedelta(days=days)
@@ -372,7 +380,7 @@ async def get_hotspots(
     crime_type: Optional[str] = None,
     days: int = Query(90, ge=7, le=365),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_role("constable")),
 ):
     """Get crime hotspot data for heatmap."""
     date_from = datetime.now() - timedelta(days=days)
@@ -426,11 +434,14 @@ async def get_audit_logs(
     return [
         {
             "id": log.id,
+            "user_id": log.user_id,
             "username": log.username,
             "action": log.action,
             "details": log.details,
+            "query_text": log.query_text,
             "risk_level": log.risk_level,
-            "timestamp": str(log.timestamp) if log.timestamp else None,
+            "timestamp": log.timestamp.isoformat(timespec="microseconds") if log.timestamp else None,
+            "previous_hash": log.previous_hash,
             "entry_hash": log.entry_hash,
         }
         for log in logs

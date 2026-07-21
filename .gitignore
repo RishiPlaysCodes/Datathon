@@ -30,5 +30,9 @@ Thumbs.db
 # Docker volumes
 postgres_data/
 
+# Catalyst deployment bundles
+backend/vendor/
+client/
+
 # Misc
 *.log

@@ -1,17 +1,24 @@
 """User-related Pydantic schemas."""
-from pydantic import BaseModel, EmailStr
+import re
+from pydantic import BaseModel, field_validator
 from typing import Optional
 from datetime import datetime
 
 
 class UserCreate(BaseModel):
+    """Public self-registration; all created accounts are citizens."""
     username: str
     email: str
     password: str
     full_name: str
-    role: str = "investigator"
-    station_id: Optional[str] = None
-    badge_number: Optional[str] = None
+
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", normalized):
+            raise ValueError("Invalid email address")
+        return normalized
 
 
 class UserLogin(BaseModel):
