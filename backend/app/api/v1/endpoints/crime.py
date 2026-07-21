@@ -426,9 +426,11 @@ async def get_audit_logs(
     """Get audit logs (supervisor only)."""
     from app.models.user import AuditLog
 
+    # Order by id so the returned sequence always matches insertion order,
+    # which is the order the tamper-evident hash chain was built in.
     offset = (page - 1) * limit
     result = await db.execute(
-        select(AuditLog).order_by(AuditLog.timestamp.desc()).offset(offset).limit(limit)
+        select(AuditLog).order_by(AuditLog.id.desc()).offset(offset).limit(limit)
     )
     logs = result.scalars().all()
     return [
