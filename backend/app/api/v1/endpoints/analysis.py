@@ -12,7 +12,7 @@ from app.services.analysis import (
     find_similar_cases, get_patrol_plan,
 )
 from app.services.fir_validator import validate_fir
-from app.services.law_data import CYBER_ATTACKS, detect_cyber_attack
+from app.services.law_data import CYBER_ATTACKS, detect_cyber_attack, detect_cyber_attacks_multi
 
 router = APIRouter(prefix="/analysis", tags=["Analysis"])
 
@@ -61,7 +61,36 @@ async def validate_fir_endpoint(req: FIRValidateRequest, user: User = Depends(ge
 
 @router.post("/cyber-forensics")
 async def cyber_forensics(req: CyberRequest, user: User = Depends(get_current_user)):
-    """Detect cyber attack method and return forensic guidance."""
-    attack_key = req.attack_type or detect_cyber_attack(req.complaint)
-    attack = CYBER_ATTACKS.get(attack_key, CYBER_ATTACKS["phishing"])
-    return {"detected_attack": attack_key, "analysis": attack, "all_types": list(CYBER_ATTACKS.keys())}
+    """Detect cyber attack method and return forensic guidance. Supports mixed attacks."""
+    from app.services.law_data import detect_cyber_attacks_multi
+    multi = detect_cyber_attacks_multi(req.complaint)
+
+    # Use explicitly selected type, or detected primary
+    attack_key = req.attack_type or multi["primary"]
+    attack = CYBER_ATTACKS.get(attack_key)
+
+    # If unknown attack type (no keywords matched)
+    if not attack:
+        return {
+            "detected_attack": "unknown",
+            "analysis": None,
+            "multi_detection": multi,
+            "all_types": list(CYBER_ATTACKS.keys()),
+            "message": "Could not identify the attack method from the description. Please select manually or provide more details.",
+        }
+
+    # Build secondary attack info if mixed
+    secondary_info = None
+    if multi.get("is_mixed_attack") and multi.get("secondary"):
+        sec_key = multi["secondary"]
+        sec_attack = CYBER_ATTACKS.get(sec_key)
+        if sec_attack:
+            secondary_info = {"key": sec_key, "name": sec_attack["name"], "description": sec_attack["description"]}
+
+    return {
+        "detected_attack": attack_key,
+        "analysis": attack,
+        "multi_detection": multi,
+        "secondary_attack": secondary_info,
+        "all_types": list(CYBER_ATTACKS.keys()),
+    }
