@@ -1,7 +1,24 @@
 import axios from 'axios'
 import type { TokenResponse, Dashboard, FIR, Accused, NetworkGraph, HotspotData, ChatResponse } from '@/types'
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8001'
+const LOCAL_API_ORIGIN = 'http://localhost:8001'
+const PRODUCTION_API_ORIGIN = 'https://prahari-final-50044229424.development.catalystappsail.in'
+
+function resolveApiOrigin(): string {
+  const fallback = import.meta.env.PROD ? PRODUCTION_API_ORIGIN : LOCAL_API_ORIGIN
+  const configuredUrl = import.meta.env.VITE_API_URL?.trim()
+
+  try {
+    // The variable is an origin, not an endpoint. Using URL.origin also repairs
+    // accidental values such as https://host/api/v1/status.
+    return new URL(configuredUrl || fallback).origin
+  } catch {
+    console.error('Invalid VITE_API_URL; using the environment default API origin.')
+    return fallback
+  }
+}
+
+export const API_BASE = resolveApiOrigin()
 
 const api = axios.create({
   baseURL: `${API_BASE}/api/v1`,
@@ -39,11 +56,11 @@ api.interceptors.response.use(
           return api(error.config)
         } catch {
           localStorage.clear()
-          window.location.href = '/login'
+          window.location.hash = '/login'
         }
       } else {
         localStorage.clear()
-        window.location.href = '/login'
+        window.location.hash = '/login'
       }
     }
     return Promise.reject(error)

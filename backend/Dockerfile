@@ -18,5 +18,5 @@ COPY . .
 # Expose port
 EXPOSE 8001
 
-# Run with uvicorn
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001", "--reload"]
+# Run one production worker on Catalyst's configured port (or 8001 locally).
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${X_ZOHO_CATALYST_LISTEN_PORT:-${PORT:-8001}}"]
