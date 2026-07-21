@@ -28,8 +28,38 @@ async def lifespan(app: FastAPI):
     logger.info("=" * 50)
     await init_db()
     logger.info("Database tables ready.")
-    logger.info(f"Server running on http://localhost:{settings.PORT}")
-    logger.info(f"API docs: http://localhost:{settings.PORT}/docs")
+
+    # Auto-seed the database if it's empty (needed on cloud deploys where
+    # the seed script isn't run separately, e.g. Catalyst AppSail).
+    try:
+        from sqlalchemy import select, func
+        from app.db.session import async_session
+        from app.models.user import User
+
+        async with async_session() as db:
+            result = await db.execute(select(func.count(User.id)))
+            user_count = result.scalar() or 0
+
+            if user_count == 0:
+                logger.info("Database is empty - seeding initial data...")
+                from app.db.init_db import (
+                    seed_users, seed_accused, seed_firs,
+                    seed_network, seed_transactions, seed_initial_audit,
+                )
+                await seed_users(db)
+                accused_list = await seed_accused(db)
+                await seed_firs(db, accused_list)
+                await seed_network(db)
+                await seed_transactions(db)
+                await seed_initial_audit(db)
+                await db.commit()
+                logger.info("Database seeded successfully!")
+            else:
+                logger.info(f"Database already has {user_count} users - skipping seed.")
+    except Exception as e:
+        logger.error(f"Seeding error (continuing anyway): {e}")
+
+    logger.info(f"Server running on port {settings.PORT}")
     logger.info("=" * 50)
     yield
     # Shutdown
