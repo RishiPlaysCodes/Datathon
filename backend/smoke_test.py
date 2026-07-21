@@ -107,6 +107,28 @@ class SmokeTest:
             return None
 
     @staticmethod
+    def cors_origin_tokens(response: Response) -> list:
+        """All Access-Control-Allow-Origin values a browser would see.
+
+        A browser rejects the request if there is more than one origin value,
+        whether that comes from duplicate header lines or a single comma-joined
+        header. urllib's .get() hides duplicates, so use get_all and also split
+        on commas to surface the real, browser-visible value set.
+        """
+        raw_values = []
+        get_all = getattr(response.headers, "get_all", None)
+        if get_all is not None:
+            raw_values = get_all("Access-Control-Allow-Origin") or []
+        else:
+            single = response.headers.get("Access-Control-Allow-Origin")
+            if single:
+                raw_values = [single]
+        tokens = []
+        for value in raw_values:
+            tokens.extend(token.strip() for token in value.split(",") if token.strip())
+        return tokens
+
+    @staticmethod
     def expect_status(response: Response, expected: Iterable[int]) -> None:
         expected_set = set(expected)
         if response.status not in expected_set:
@@ -210,13 +232,35 @@ class SmokeTest:
                 },
             )
             self.expect_status(response, [200])
-            allowed_origin = response.headers.get("Access-Control-Allow-Origin")
-            self.require(allowed_origin in ("*", frontend_origin), f"CORS origin not allowed: {allowed_origin!r}")
+            tokens = self.cors_origin_tokens(response)
+            self.require(
+                len(tokens) == 1,
+                f"Access-Control-Allow-Origin must be exactly one value (browsers reject duplicates), got {tokens}",
+            )
+            self.require(tokens[0] in ("*", frontend_origin), f"CORS origin not allowed: {tokens[0]!r}")
             allowed_methods = response.headers.get("Access-Control-Allow-Methods", "")
             self.require("POST" in allowed_methods or "*" in allowed_methods, "CORS does not allow POST")
 
+        def cors_actual_login():
+            # Browsers also enforce a single Allow-Origin on the actual (non-preflight)
+            # response, so verify the real login call the same way the browser sees it.
+            response = self.request(
+                "POST",
+                "auth/login",
+                headers={"Origin": frontend_origin},
+                json_body={"username": "demo", "password": "demo123"},
+            )
+            self.expect_status(response, [200])
+            tokens = self.cors_origin_tokens(response)
+            self.require(
+                len(tokens) == 1,
+                f"login response Access-Control-Allow-Origin must be one value, got {tokens}",
+            )
+            self.require(tokens[0] in ("*", frontend_origin), f"login CORS origin not allowed: {tokens[0]!r}")
+
         self.check("Deployed frontend is the full PRAHARI bundle", frontend_bundle)
-        self.check("Browser login CORS preflight", cors_preflight)
+        self.check("Browser login CORS preflight (single Allow-Origin)", cors_preflight)
+        self.check("Browser login actual response CORS", cors_actual_login)
 
     def test_authentication(self) -> None:
         for username, (password, expected_role) in DEMO_USERS.items():
