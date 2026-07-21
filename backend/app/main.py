@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.api.v1.api import api_router
 from app.db.session import init_db
+from app.db.init_db import seed_database_if_empty
 
 # Setup logging - shows in terminal
 logging.basicConfig(
@@ -28,8 +29,12 @@ async def lifespan(app: FastAPI):
     logger.info("=" * 50)
     await init_db()
     logger.info("Database tables ready.")
-    logger.info(f"Server running on http://localhost:{settings.PORT}")
-    logger.info(f"API docs: http://localhost:{settings.PORT}/docs")
+    if await seed_database_if_empty():
+        logger.info("Demo users and crime data seeded.")
+    else:
+        logger.info("Existing database data preserved.")
+    logger.info(f"Server listening on {settings.HOST}:{settings.listen_port}")
+    logger.info("API docs available at /docs")
     logger.info("=" * 50)
     yield
     # Shutdown
@@ -43,10 +48,10 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS - Allow frontend access
+# CORS - Allow configured frontend origins, including the Catalyst client.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins for development
+    allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -80,5 +85,6 @@ async def root():
 
 
 @app.get("/health")
+@app.get("/api/v1/status")
 async def health():
     return {"status": "healthy", "service": "prahari-backend"}
