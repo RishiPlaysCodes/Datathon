@@ -115,12 +115,13 @@ async def chat(
     # ===== REAL LLM LAYER (Gemini) - answers anything, any language =====
     # If a Gemini key is configured, use it to generate a natural, multilingual,
     # grounded answer. The rule-based response_text becomes the fallback.
+    import logging as _logging
+    _log = _logging.getLogger("prahari")
     try:
         from app.services.llm import is_llm_available, build_grounding_context, generate_answer, suggest_followups
         if is_llm_available():
-            # Gather DB stats for grounding
+            _log.info("AI CHAT: using Gemini LLM for this query")
             stats = await _gather_stats(db)
-            # RAG snippets
             rag_snippets = []
             try:
                 from app.services.rag_pipeline import semantic_search
@@ -129,7 +130,6 @@ async def chat(
                                         f"{r.get('location_name','?')} - {(r.get('description') or '')[:80]}")
             except Exception:
                 pass
-            # Conversation history for multi-turn context
             hist_result = await db.execute(
                 select(ConversationHistory)
                 .where(ConversationHistory.session_id == session_id)
@@ -141,11 +141,16 @@ async def chat(
             llm_answer = generate_answer(message.message, context, history)
             if llm_answer:
                 response_text = llm_answer
+                intent = "llm_answer"
                 llm_suggestions = suggest_followups(message.message, llm_answer)
                 if llm_suggestions:
                     suggestions = llm_suggestions
+            else:
+                _log.warning("AI CHAT: Gemini returned empty - using rule-based fallback")
+        else:
+            _log.info("AI CHAT: Gemini NOT available - using rule-based fallback")
     except Exception as e:
-        pass  # Any LLM failure -> keep rule-based response_text
+        _log.error(f"AI CHAT: LLM layer error ({e}) - using rule-based fallback")
 
     # Apply Kannada dictionary translation ONLY as a fallback (when LLM is off
     # and user explicitly requested Kannada). Gemini handles language natively.
