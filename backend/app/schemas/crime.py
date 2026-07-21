@@ -23,6 +23,7 @@ class FIRResponse(BaseModel):
     status: str
     severity: str
     investigating_officer: Optional[str] = None
+    complainant_name: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -44,6 +45,8 @@ class AccusedResponse(BaseModel):
     is_repeat_offender: bool
     total_cases: int
     gang_id: Optional[str] = None
+    osint_verified: bool = False
+    osint_sources: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -145,3 +148,14 @@ class AuditLogResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# --- Deepfake Detection Schema ---
+class DeepfakeResult(BaseModel):
+    filename: str
+    file_size: int
+    is_deepfake: bool
+    confidence: float
+    risk_level: str  # low, medium, high, critical
+    analysis_details: Dict[str, Any]
+    recommendations: List[str]

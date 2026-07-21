@@ -37,6 +37,7 @@ export interface FIR {
   status: string
   severity: string
   investigating_officer?: string
+  complainant_name?: string
 }
 
 export interface Accused {
@@ -49,6 +50,8 @@ export interface Accused {
   is_repeat_offender: boolean
   total_cases: number
   gang_id?: string
+  osint_verified?: boolean
+  osint_sources?: string
 }
 
 // Network Types

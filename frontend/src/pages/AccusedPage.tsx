@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { crimeAPI } from '@/lib/api'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
-import { Search, Users, Shield, AlertTriangle, TrendingUp } from 'lucide-react'
+import { Search, Users, Shield, AlertTriangle, TrendingUp, Globe } from 'lucide-react'
 import { getRiskColor, getRiskLabel } from '@/lib/utils'
 
 export function AccusedPage() {
@@ -98,6 +98,11 @@ export function AccusedPage() {
                       GANG
                     </span>
                   )}
+                  {a.osint_verified && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-400 flex items-center gap-0.5">
+                      <Globe className="w-2.5 h-2.5" /> OSINT
+                    </span>
+                  )}
                 </div>
               </button>
             ))
@@ -113,7 +118,22 @@ export function AccusedPage() {
               {/* Risk Score Card */}
               <div className="glass-card p-6">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-bold text-white">{profile.accused.name}</h3>
+                  <div>
+                    <h3 className="text-lg font-bold text-white">{profile.accused.name}</h3>
+                    {profile.accused.osint_verified && (
+                      <div className="flex items-center gap-1.5 mt-1">
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 flex items-center gap-1">
+                          <Globe className="w-3 h-3" />
+                          OSINT Verified
+                        </span>
+                        {profile.accused.osint_sources && (
+                          <span className="text-[10px] text-gray-500">
+                            ({JSON.parse(profile.accused.osint_sources || '[]').length} sources)
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
                   <div className={`text-center ${getRiskColor(profile.risk_breakdown.total_score)}`}>
                     <p className="text-3xl font-bold">{profile.risk_breakdown.total_score.toFixed(0)}</p>
                     <p className="text-xs uppercase">{profile.risk_breakdown.risk_level} Risk</p>
@@ -153,6 +173,27 @@ export function AccusedPage() {
                 <h4 className="text-sm font-semibold text-gray-300 mb-2">Behavioral Profile</h4>
                 <p className="text-sm text-gray-400 leading-relaxed">{profile.behavioral_profile}</p>
               </div>
+
+              {/* OSINT Intelligence */}
+              {profile.accused.osint_verified && profile.accused.osint_sources && (
+                <div className="glass-card p-4 border border-cyan-500/20">
+                  <h4 className="text-sm font-semibold text-cyan-300 mb-3 flex items-center gap-2">
+                    <Globe className="w-4 h-4" />
+                    OSINT Intelligence Sources
+                  </h4>
+                  <div className="space-y-2">
+                    {JSON.parse(profile.accused.osint_sources || '[]').map((source: string, idx: number) => (
+                      <div key={idx} className="flex items-center gap-2 text-sm">
+                        <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 flex-shrink-0" />
+                        <span className="text-gray-400">{source}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-[10px] text-gray-600 mt-3">
+                    Data corroborated from open-source intelligence platforms
+                  </p>
+                </div>
+              )}
 
               {/* Network Connections */}
               {profile.network_connections.length > 0 && (

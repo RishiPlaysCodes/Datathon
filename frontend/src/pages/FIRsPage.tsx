@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { crimeAPI } from '@/lib/api'
+import { useAuthStore } from '@/stores/authStore'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
-import { Search, Filter, FileText, MapPin, Calendar, AlertCircle } from 'lucide-react'
+import { Search, Filter, FileText, MapPin, Calendar, AlertCircle, ShieldAlert } from 'lucide-react'
 import { formatDate, getRiskBadge } from '@/lib/utils'
 
 export function FIRsPage() {
@@ -10,6 +11,8 @@ export function FIRsPage() {
   const [crimeType, setCrimeType] = useState('')
   const [status, setStatus] = useState('')
   const [page, setPage] = useState(1)
+  const { user } = useAuthStore()
+  const isCitizen = user?.role === 'citizen'
 
   const { data, isLoading } = useQuery({
     queryKey: ['firs', search, crimeType, status, page],
@@ -44,8 +47,20 @@ export function FIRsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-white">FIR Records</h1>
-        <p className="text-gray-400 text-sm mt-1">Browse and search First Information Reports</p>
+        <h1 className="text-2xl font-bold text-white">
+          {isCitizen ? 'My FIR Complaints' : 'FIR Records'}
+        </h1>
+        <p className="text-gray-400 text-sm mt-1">
+          {isCitizen
+            ? 'Track the status of your filed complaints'
+            : 'Browse and search First Information Reports'}
+        </p>
+        {isCitizen && (
+          <div className="mt-2 flex items-center gap-2 text-xs text-yellow-400 bg-yellow-500/10 border border-yellow-500/20 px-3 py-1.5 rounded-lg w-fit">
+            <ShieldAlert className="w-3.5 h-3.5" />
+            <span>Citizen view — only your filed FIRs are shown</span>
+          </div>
+        )}
       </div>
 
       {/* Filters */}
@@ -132,7 +147,7 @@ export function FIRsPage() {
                     </div>
                   </div>
                 </div>
-                {fir.modus_operandi && (
+                {fir.modus_operandi && !isCitizen && (
                   <div className="mt-3 pt-3 border-t border-dark-700/30">
                     <p className="text-xs text-gray-500">
                       <span className="font-medium text-gray-400">MO:</span> {fir.modus_operandi}

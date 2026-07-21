@@ -1,23 +1,38 @@
 import { NavLink } from 'react-router-dom'
 import {
   MessageSquare, LayoutDashboard, Network, Map, Users,
-  Shield, FileText, TrendingUp, LogOut, Activity
+  Shield, FileText, TrendingUp, LogOut, Activity, ScanSearch
 } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 
-const navItems = [
-  { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/chat', icon: MessageSquare, label: 'AI Chat' },
-  { to: '/firs', icon: FileText, label: 'FIR Records' },
-  { to: '/network', icon: Network, label: 'Network Graph' },
-  { to: '/hotspots', icon: Map, label: 'Hotspot Map' },
-  { to: '/accused', icon: Users, label: 'Accused' },
-  { to: '/analytics', icon: TrendingUp, label: 'Analytics' },
-  { to: '/audit', icon: Shield, label: 'Audit Logs' },
+const allNavItems = [
+  { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', minRole: 'citizen' },
+  { to: '/chat', icon: MessageSquare, label: 'AI Chat', minRole: 'citizen' },
+  { to: '/firs', icon: FileText, label: 'FIR Records', minRole: 'citizen' },
+  { to: '/deepfake', icon: ScanSearch, label: 'Deepfake Detect', minRole: 'citizen' },
+  { to: '/network', icon: Network, label: 'Network Graph', minRole: 'constable' },
+  { to: '/hotspots', icon: Map, label: 'Hotspot Map', minRole: 'constable' },
+  { to: '/accused', icon: Users, label: 'Accused', minRole: 'constable' },
+  { to: '/analytics', icon: TrendingUp, label: 'Analytics', minRole: 'constable' },
+  { to: '/audit', icon: Shield, label: 'Audit Logs', minRole: 'supervisor' },
 ]
+
+const ROLE_LEVEL: Record<string, number> = {
+  citizen: 0,
+  constable: 1,
+  investigator: 2,
+  analyst: 3,
+  supervisor: 4,
+  policymaker: 5,
+}
 
 export function Sidebar() {
   const { user, logout } = useAuthStore()
+  const userLevel = ROLE_LEVEL[user?.role || 'citizen'] ?? 0
+
+  const navItems = allNavItems.filter(
+    (item) => userLevel >= (ROLE_LEVEL[item.minRole] ?? 0)
+  )
 
   return (
     <aside className="fixed left-0 top-0 h-screen w-64 bg-dark-900 border-r border-dark-700/50 flex flex-col z-50">
