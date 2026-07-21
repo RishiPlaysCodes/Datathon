@@ -1,6 +1,5 @@
 """Security utilities: JWT tokens, password hashing, role-based access."""
 import hashlib
-import time
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -11,32 +10,41 @@ from app.core.config import settings
 
 logger = logging.getLogger("prahari")
 
-# Try passlib+bcrypt first, fallback to hashlib for compatibility
+# Password hashing - try bcrypt via passlib, fallback to sha256
+_USE_BCRYPT = False
 try:
     from passlib.context import CryptContext
     pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+    # Test it actually works
+    _test_hash = pwd_context.hash("test")
+    pwd_context.verify("test", _test_hash)
+    _USE_BCRYPT = True
+    logger.info("Using bcrypt for password hashing")
+except Exception:
+    logger.warning("bcrypt unavailable, using sha256 fallback")
 
-    def verify_password(plain_password: str, hashed_password: str) -> bool:
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """Verify password against hash."""
+    if _USE_BCRYPT:
         try:
             return pwd_context.verify(plain_password, hashed_password)
-        except Exception as e:
-            logger.error(f"Password verify error: {e}")
-            return hashlib.sha256(plain_password.encode()).hexdigest() == hashed_password
+        except Exception:
+            pass
+    # Fallback: sha256
+    return hashlib.sha256(plain_password.encode()).hexdigest() == hashed_password
 
-    def get_password_hash(password: str) -> str:
+
+def get_password_hash(password: str) -> str:
+    """Hash a password."""
+    if _USE_BCRYPT:
         try:
             return pwd_context.hash(password)
-        except Exception as e:
-            logger.error(f"Password hash error (falling back to sha256): {e}")
-            return hashlib.sha256(password.encode()).hexdigest()
+        except Exception:
+            pass
+    # Fallback: sha256
+    return hashlib.sha256(password.encode()).hexdigest()
 
-except ImportError:
-    # If passlib not available, use simple sha256
-    def verify_password(plain_password: str, hashed_password: str) -> bool:
-        return hashlib.sha256(plain_password.encode()).hexdigest() == hashed_password
-
-    def get_password_hash(password: str) -> str:
-        return hashlib.sha256(password.encode()).hexdigest()
 
 # Role hierarchy: higher number = more access
 ROLE_HIERARCHY = {
