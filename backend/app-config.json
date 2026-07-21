@@ -1,5 +1,5 @@
 {
-	"command": "python server.py",
+	"command": "python3 server.py",
 	"build_path": ".",
 	"stack": "python_3_11",
 	"env_variables": {},
