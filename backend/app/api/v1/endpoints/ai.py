@@ -527,36 +527,73 @@ async def _handle_statistics_query(db: AsyncSession, filters: dict, query: str):
 
 
 async def _handle_general_query(query: str, db: AsyncSession):
-    """Handle general/conversational queries."""
-    # Simple keyword-based response for common queries
+    """Handle general/conversational + self-awareness queries (multilingual)."""
     query_lower = query.lower()
 
-    if any(w in query_lower for w in ["help", "what can you do", "capabilities"]):
+    # Capabilities / help / "what can you do" - English + Hindi + Kannada keywords
+    help_words = ["help", "what can you do", "capabilities", "features", "kya kar sakte",
+                  "kya kar sakta", "madad", "ಸಹಾಯ", "ಏನು ಮಾಡಬಹುದು", "kaam", "kya hai"]
+    if any(w in query_lower for w in help_words):
         return (
-            "I'm PRAHARI, your Crime Intelligence Assistant. I can help you with:\n\n"
-            "- **Search FIRs**: 'Show chain-snatching cases in Koramangala last 6 months'\n"
-            "- **Accused Info**: 'Tell me about accused Ravi Kumar'\n"
-            "- **Network Analysis**: 'Show criminal network for Suresh'\n"
-            "- **Hotspot Maps**: 'Show crime hotspots in Bangalore'\n"
-            "- **Risk Assessment**: 'What is the risk score for accused #5?'\n"
-            "- **Statistics**: 'Crime statistics for last quarter'\n\n"
-            "Try asking a question in natural language!"
+            "**I'm PRAHARI** - Predictive Relational AI for Holistic Analytics & Response Intelligence, "
+            "the crime intelligence brain for Karnataka State Police.\n\n"
+            "**What I can do for you:**\n"
+            "- 🔍 **Search FIRs** - 'Show chain-snatching cases in Koramangala last 6 months'\n"
+            "- 👤 **Accused profiles & risk** - 'Tell me about Ravi Kumar' / 'high risk offenders'\n"
+            "- 🔗 **Criminal networks** - 'Show network for Suresh' (Network Graph page)\n"
+            "- 🗺️ **Hotspots** - 'Crime hotspots in Bangalore' (Hotspot Map page)\n"
+            "- 📊 **Statistics & trends** - 'Crime statistics last quarter' (Analytics page)\n"
+            "- ⚖️ **FIR validation, 🕵️ Cyber forensics, 💰 Financial analysis, 🚔 Patrol AI** and more\n\n"
+            "**Tip:** Add your Gemini API key to unlock full conversational AI (answers ANY question in English/Hindi/Kannada). "
+            "Ask me in any language - I understand all three!"
         )
 
-    if any(w in query_lower for w in ["hello", "hi", "hey", "namaste"]):
+    # Self-awareness: "how do you work", "how are you built", "which factors"
+    how_words = ["how do you work", "how are you built", "how you work", "kaise kaam",
+                 "kaise bana", "which factor", "risk factor", "how is risk", "ಹೇಗೆ ಕೆಲಸ"]
+    if any(w in query_lower for w in how_words):
         return (
-            "Namaste! I'm PRAHARI - your Predictive Relational AI for Holistic Analytics "
-            "& Response Intelligence. How can I assist your investigation today?"
+            "**How PRAHARI works:**\n\n"
+            "- **Hybrid NLU** classifies your intent and extracts filters (crime type, location, dates).\n"
+            "- **NL2SQL** converts it to safe SQL (shown to you for transparency).\n"
+            "- **RAG semantic search** (FAISS/Sentence-BERT) finds related FIRs so answers stay grounded.\n"
+            "- **Risk scoring** = 40% criminal history + 25% network centrality + 20% MO escalation + 15% recency.\n"
+            "- **Graph analysis** (NetworkX) detects gangs (community detection) and key players (centrality).\n\n"
+            "Everything is auditable and explainable - no black box. Ask me about any case, accused, or trend!"
+        )
+
+    # Navigation: "how do I see / where is X"
+    nav_words = ["how do i", "where is", "how to see", "kaise dekhu", "kahan hai", "ಎಲ್ಲಿ"]
+    if any(w in query_lower for w in nav_words):
+        return (
+            "**Navigating PRAHARI** (use the left sidebar):\n\n"
+            "- **Command Center** - live overview (map + chat + alerts)\n"
+            "- **Network Graph** - criminal connections\n"
+            "- **Hotspot Map** - crime density\n"
+            "- **Accused** - profiles + risk scores\n"
+            "- **Analytics / Forecast / Patrol AI** - trends & predictions\n"
+            "- **FIR Validator / Cyber Forensics / Financial / OSINT** - specialised tools\n"
+            "- **Citizen Portal** (/citizen) - public complaint filing\n\n"
+            "Or just ask me here in plain language and I'll fetch it for you!"
+        )
+
+    # Greetings - multilingual
+    if any(w in query_lower for w in ["hello", "hi ", "hey", "namaste", "namaskara", "ನಮಸ್ಕಾರ", "नमस्ते"]):
+        return (
+            "Namaste! 🙏 I'm **PRAHARI**, your Crime Intelligence Assistant. "
+            "You can ask me in English, Hindi, or Kannada about any case, accused, network, "
+            "hotspot, or trend. How can I help your investigation today?"
         )
 
     return (
-        "I understand your query but need more context. You can ask me about:\n"
-        "- FIR searches by location, crime type, or time period\n"
-        "- Criminal network analysis\n"
-        "- Risk assessment of accused persons\n"
-        "- Crime hotspot analysis\n"
-        "- Statistics and trends\n\n"
-        "Please rephrase your question with specific details."
+        "I can help you analyse crimes, accused, networks, hotspots, risk scores, and trends. "
+        "Try asking (in English, Hindi, or Kannada):\n"
+        "- 'Show theft cases in Koramangala'\n"
+        "- 'Koramangala mein kitne case hue?'\n"
+        "- 'Who are the high-risk offenders?'\n"
+        "- 'What can you do?' / 'How do you work?'\n\n"
+        "**For full free-form AI in any language, add a Gemini API key** (see setup). "
+        "Then I can answer literally anything about the data."
     )
 
 

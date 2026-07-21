@@ -33,7 +33,7 @@ export function ChatPage() {
   const [loading, setLoading] = useState(false)
   const [sessionId, setSessionId] = useState<string | undefined>()
   const [isListening, setIsListening] = useState(false)
-  const [language, setLanguage] = useState<'en' | 'kn'>('en')
+  const [language, setLanguage] = useState<'en' | 'hi' | 'kn'>('en')
   const [aiStatus, setAiStatus] = useState<any>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const recognitionRef = useRef<any>(null)
@@ -50,20 +50,39 @@ export function ChatPage() {
   const startVoiceInput = useCallback(() => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
     if (!SpeechRecognition) {
-      toast.error('Voice input not supported in this browser. Use Chrome.')
+      toast.error('Voice not supported here. Please use Google Chrome or Microsoft Edge.')
+      return
+    }
+
+    // Require a secure context (mic only works on https or localhost)
+    if (!window.isSecureContext && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+      toast.error('Microphone needs a secure page (https or localhost).')
       return
     }
 
     const recognition = new SpeechRecognition()
-    recognition.lang = language === 'kn' ? 'kn-IN' : 'en-IN'
+    // Match voice language to selected UI language
+    recognition.lang = language === 'kn' ? 'kn-IN' : language === 'hi' ? 'hi-IN' : 'en-IN'
     recognition.interimResults = true
     recognition.continuous = false
+    recognition.maxAlternatives = 1
 
     recognition.onstart = () => setIsListening(true)
     recognition.onend = () => setIsListening(false)
-    recognition.onerror = () => {
+
+    recognition.onerror = (event: any) => {
       setIsListening(false)
-      toast.error('Voice recognition failed. Try again.')
+      const err = event?.error
+      const messages: Record<string, string> = {
+        'no-speech': 'No speech detected. Please speak clearly into the mic.',
+        'audio-capture': 'No microphone found. Please connect/enable a mic.',
+        'not-allowed': 'Microphone blocked. Click the mic/lock icon in the address bar and allow microphone access.',
+        'service-not-allowed': 'Mic permission denied by browser settings. Allow microphone for this site.',
+        'network': 'Voice needs internet (Chrome speech uses Google servers). Check your connection.',
+        'aborted': '', // user stopped - no error toast
+      }
+      const msg = err in messages ? messages[err] : `Voice error: ${err || 'unknown'}. Try again.`
+      if (msg) toast.error(msg)
     }
 
     recognition.onresult = (event: any) => {
@@ -71,17 +90,15 @@ export function ChatPage() {
         .map((result: any) => result[0].transcript)
         .join('')
       setInput(transcript)
-
-      // Auto-send when final result
-      if (event.results[0].isFinal) {
-        setTimeout(() => {
-          setInput(transcript)
-        }, 100)
-      }
     }
 
-    recognition.start()
-    recognitionRef.current = recognition
+    try {
+      recognition.start()
+      recognitionRef.current = recognition
+    } catch (e) {
+      setIsListening(false)
+      toast.error('Could not start voice input. Try clicking the mic again.')
+    }
   }, [language])
 
   const stopVoiceInput = useCallback(() => {
@@ -158,7 +175,7 @@ export function ChatPage() {
   // ========== TEXT TO SPEECH (Read AI response aloud) ==========
   const speakText = useCallback((text: string) => {
     const utterance = new SpeechSynthesisUtterance(text.replace(/\*\*/g, '').replace(/[#\-*]/g, ''))
-    utterance.lang = language === 'kn' ? 'kn-IN' : 'en-IN'
+    utterance.lang = language === 'kn' ? 'kn-IN' : language === 'hi' ? 'hi-IN' : 'en-IN'
     utterance.rate = 0.9
     window.speechSynthesis.speak(utterance)
     toast.success(language === 'kn' ? 'ಧ್ವನಿ ಪ್ಲೇಬ್ಯಾಕ್...' : 'Playing audio...')
@@ -225,16 +242,16 @@ export function ChatPage() {
         <div className="flex items-center gap-2">
           {/* Language Toggle */}
           <button
-            onClick={() => setLanguage(l => l === 'en' ? 'kn' : 'en')}
+            onClick={() => setLanguage(l => l === 'en' ? 'hi' : l === 'hi' ? 'kn' : 'en')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-              language === 'kn'
+              language !== 'en'
                 ? 'bg-primary-500/20 text-primary-400 border border-primary-500/30'
                 : 'bg-dark-700 text-gray-400 border border-dark-600'
             }`}
-            title="Toggle English/Kannada"
+            title="Switch language: English → Hindi → Kannada"
           >
             <Globe className="w-3.5 h-3.5" />
-            {language === 'kn' ? 'ಕನ್ನಡ' : 'EN'}
+            {language === 'kn' ? 'ಕನ್ನಡ' : language === 'hi' ? 'हिंदी' : 'EN'}
           </button>
           {/* PDF Export */}
           <button
@@ -325,7 +342,7 @@ function MessageBubble({ message, onSuggestionClick, onSpeak, language }: {
   message: ChatMessage
   onSuggestionClick: (text: string) => void
   onSpeak: (text: string) => void
-  language: 'en' | 'kn'
+  language: 'en' | 'hi' | 'kn'
 }) {
   const isUser = message.role === 'user'
 
