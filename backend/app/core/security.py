@@ -21,8 +21,6 @@ try:
             return pwd_context.verify(plain_password, hashed_password)
         except Exception as e:
             logger.error(f"Password verify error: {e}")
-            # Fallback: direct comparison for sha256 hashes
-            import hashlib
             return hashlib.sha256(plain_password.encode()).hexdigest() == hashed_password
 
     def get_password_hash(password: str) -> str:
@@ -49,14 +47,6 @@ ROLE_HIERARCHY = {
     "supervisor": 4,
     "policymaker": 5,
 }
-
-
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
-
-
-def get_password_hash(password: str) -> str:
-    return pwd_context.hash(password)
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
