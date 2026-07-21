@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Activity, Eye, EyeOff } from 'lucide-react'
-import { authAPI } from '@/lib/api'
+import { authAPI, getApiErrorMessage } from '@/lib/api'
 import { useAuthStore } from '@/stores/authStore'
 import toast from 'react-hot-toast'
 
@@ -20,9 +20,9 @@ export function LoginPage() {
       const data = await authAPI.login(username, password)
       login(data.user, data.access_token, data.refresh_token)
       toast.success(`Welcome back, ${data.user.full_name}!`)
-      navigate('/dashboard')
+      navigate(data.user.role === 'citizen' ? '/firs' : '/dashboard')
     } catch (err: any) {
-      toast.error(err.response?.data?.detail || 'Login failed')
+      toast.error(getApiErrorMessage(err, 'Login failed'))
     } finally {
       setLoading(false)
     }
@@ -36,9 +36,9 @@ export function LoginPage() {
       const data = await authAPI.login(user, pass)
       login(data.user, data.access_token, data.refresh_token)
       toast.success(`Welcome, ${data.user.full_name}!`)
-      navigate('/dashboard')
+      navigate(data.user.role === 'citizen' ? '/firs' : '/dashboard')
     } catch (err: any) {
-      toast.error(err.response?.data?.detail || 'Login failed')
+      toast.error(getApiErrorMessage(err, 'Login failed'))
     } finally {
       setLoading(false)
     }

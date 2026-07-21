@@ -8,6 +8,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 sys.path.insert(0, ".")
 
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from app.db.session import engine, async_session, Base
 from app.models.user import User, AuditLog, ConversationHistory
 from app.models.crime import FIR, Accused, Victim, FIRAccusedLink, CriminalNetwork, Transaction
@@ -146,9 +147,11 @@ async def seed_firs(db: AsyncSession, accused_list: list):
     """Seed FIRs and link to accused. Some FIRs assigned to citizen user."""
     fir_data = generate_firs(220)
 
-    # Citizen user will be user_id 6 (6th user seeded)
-    CITIZEN_USER_ID = 6
-    CITIZEN_NAME = "Ramesh Citizen"
+    citizen = (
+        await db.execute(select(User).where(User.username == "citizen1"))
+    ).scalar_one()
+    citizen_user_id = citizen.id
+    citizen_name = citizen.full_name
 
     for i, data in enumerate(fir_data):
         # Convert date strings to datetime objects
@@ -157,8 +160,8 @@ async def seed_firs(db: AsyncSession, accused_list: list):
 
         # Assign first 5 FIRs to citizen user (their filed complaints)
         if i < 5:
-            data["complainant_name"] = CITIZEN_NAME
-            data["complainant_user_id"] = CITIZEN_USER_ID
+            data["complainant_name"] = citizen_name
+            data["complainant_user_id"] = citizen_user_id
         else:
             # Some random FIRs have complainant names but not linked to a user account
             data["complainant_name"] = f"Complainant {random.choice(['Suresh', 'Kavitha', 'Anil', 'Meena', 'Ramesh'])}"
@@ -234,13 +237,24 @@ async def seed_transactions(db: AsyncSession):
 
 async def seed_initial_audit(db: AsyncSession):
     """Create initial audit log entry."""
-    initial_hash = compute_audit_hash("GENESIS", "SYSTEM_INIT", "system", datetime.now().isoformat())
+    timestamp = datetime.utcnow()
+    details = "PRAHARI system initialized with seed data"
+    initial_hash = compute_audit_hash(
+        "GENESIS",
+        "DATABASE_INITIALIZED",
+        "1",
+        timestamp.isoformat(timespec="microseconds"),
+        username="system",
+        details=details,
+        risk_level="low",
+    )
     audit = AuditLog(
         user_id=1,
         username="system",
         action="DATABASE_INITIALIZED",
-        details="PRAHARI system initialized with seed data",
+        details=details,
         risk_level="low",
+        timestamp=timestamp,
         previous_hash="GENESIS",
         entry_hash=initial_hash,
     )

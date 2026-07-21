@@ -68,25 +68,38 @@ CRIME_TYPES = {
 }
 
 
+# Prefer specific analytical intents when multiple patterns tie. For example,
+# "Show criminal network for Ravi Kumar" contains both "criminal" and
+# "network", but the network request is the user's actual intent.
+INTENT_PRIORITY = [
+    "network_analysis",
+    "risk_assessment",
+    "hotspot_analysis",
+    "statistics",
+    "search_firs",
+    "accused_info",
+]
+
+
 def classify_intent(query: str) -> Dict[str, Any]:
     """Classify the intent of a natural language query."""
-    query_lower = query.lower().strip()
+    original_query = query.strip()
+    query_lower = original_query.lower()
 
-    # Score each intent
     scores = {}
     for intent, patterns in INTENT_PATTERNS.items():
-        score = 0
-        for pattern in patterns:
-            if re.search(pattern, query_lower):
-                score += 1
-        scores[intent] = score
+        scores[intent] = sum(1 for pattern in patterns if re.search(pattern, query_lower))
 
-    # Get best intent
-    best_intent = max(scores, key=scores.get) if max(scores.values()) > 0 else "general"
+    highest_score = max(scores.values())
+    best_intent = (
+        next(intent for intent in INTENT_PRIORITY if scores[intent] == highest_score)
+        if highest_score > 0
+        else "general"
+    )
     confidence = min(scores.get(best_intent, 0) / 3.0, 1.0) if best_intent != "general" else 0.3
 
-    # Extract filters
-    filters = extract_filters(query_lower)
+    # Preserve original casing so proper names can be extracted reliably.
+    filters = extract_filters(original_query)
 
     return {
         "intent": best_intent,
@@ -97,25 +110,20 @@ def classify_intent(query: str) -> Dict[str, Any]:
 
 
 def extract_filters(query: str) -> Dict[str, Any]:
-    """Extract structured filters from natural language query."""
+    """Extract structured filters while preserving original case for names."""
     filters = {}
+    query_lower = query.lower()
 
-    # Extract location
     for loc in LOCATIONS:
-        if loc in query:
+        if loc in query_lower:
             filters["location"] = loc.title()
             break
 
-    # Extract crime type
     for crime_type, patterns in CRIME_TYPES.items():
-        for pattern in patterns:
-            if re.search(pattern, query):
-                filters["crime_type"] = crime_type
-                break
-        if "crime_type" in filters:
+        if any(re.search(pattern, query_lower) for pattern in patterns):
+            filters["crime_type"] = crime_type
             break
 
-    # Extract time period
     time_patterns = [
         (r"last\s+(\d+)\s+month", lambda m: int(m.group(1)) * 30),
         (r"last\s+(\d+)\s+week", lambda m: int(m.group(1)) * 7),
@@ -132,43 +140,37 @@ def extract_filters(query: str) -> Dict[str, Any]:
     ]
 
     for pattern, days_func in time_patterns:
-        match = re.search(pattern, query)
+        match = re.search(pattern, query_lower)
         if match:
             filters["days"] = days_func(match)
             break
-
     if "days" not in filters:
-        filters["days"] = 180  # Default 6 months
+        filters["days"] = 180
 
-    # Extract repeat offender filter
-    if any(word in query for word in ["repeat", "habitual", "serial", "recidivist"]):
+    if any(word in query_lower for word in ["repeat", "habitual", "serial", "recidivist"]):
         filters["repeat_offenders"] = True
 
-    # Extract name (look for proper nouns after certain keywords)
     name_patterns = [
         r"(?:about|for|of|named?)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)",
-        r"([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)",  # Multiple capitalized words
+        r"([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)",
     ]
-    # Use original case for name extraction
-    for pattern in name_patterns:
-        match = re.search(pattern, query)
+    for index, pattern in enumerate(name_patterns):
+        flags = re.IGNORECASE if index == 0 else 0
+        match = re.search(pattern, query, flags=flags)
         if match:
             name = match.group(1)
-            # Filter out common words
             if name.lower() not in ["show", "find", "tell", "give", "last", "the", "all", "me"]:
                 filters["name"] = name
                 break
 
-    # Extract gender filter
-    if "female" in query or "women" in query or "woman" in query:
+    if any(word in query_lower for word in ["female", "women", "woman"]):
         filters["gender"] = "female"
-    elif "male" in query or "men" in query or "man" in query:
+    elif any(word in query_lower for word in ["male", "men", "man"]):
         filters["gender"] = "male"
 
-    # Extract status
-    if "open" in query or "active" in query or "pending" in query:
+    if any(word in query_lower for word in ["open", "active", "pending"]):
         filters["status"] = "open"
-    elif "closed" in query or "solved" in query:
+    elif any(word in query_lower for word in ["closed", "solved"]):
         filters["status"] = "closed"
 
     return filters

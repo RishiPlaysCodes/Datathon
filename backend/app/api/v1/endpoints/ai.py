@@ -11,9 +11,10 @@ from app.db.session import get_db
 from app.models.user import User, ConversationHistory
 from app.models.crime import FIR, Accused, FIRAccusedLink
 from app.schemas.crime import ChatMessage, ChatResponse, FIRResponse
-from app.api.deps import get_current_user
+from app.api.deps import require_role
 from app.services.intent import classify_intent, extract_filters
 from app.services.risk import calculate_risk_score
+from app.services.audit import record_audit_event
 
 router = APIRouter(prefix="/ai", tags=["AI Chat"])
 
@@ -22,7 +23,7 @@ router = APIRouter(prefix="/ai", tags=["AI Chat"])
 async def chat(
     message: ChatMessage,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_role("constable")),
 ):
     """Process natural language query and return intelligence."""
     session_id = message.session_id or str(uuid.uuid4())
@@ -106,6 +107,14 @@ async def chat(
         metadata_json=json.dumps({"intent": intent, "filters": filters}) if intent else None,
     )
     db.add(assistant_msg)
+    await record_audit_event(
+        db,
+        current_user,
+        "AI_QUERY",
+        details=f"Classified intent: {intent}",
+        query_text=message.message,
+        risk_level="medium" if intent in {"network_analysis", "risk_assessment"} else "low",
+    )
 
     return ChatResponse(
         response=response_text,
@@ -342,17 +351,25 @@ async def _handle_statistics_query(db: AsyncSession, filters: dict, query: str):
     """Handle statistics queries."""
     days = filters.get("days", 90)
     date_from = datetime.now() - timedelta(days=days)
+    conditions = [FIR.date_of_occurrence >= date_from]
+    if filters.get("crime_type"):
+        conditions.append(FIR.crime_type.ilike(f"%{filters['crime_type']}%"))
+    if filters.get("location"):
+        conditions.append(
+            (FIR.location_name.ilike(f"%{filters['location']}%"))
+            | (FIR.district.ilike(f"%{filters['location']}%"))
+        )
 
     # Total FIRs
     total_result = await db.execute(
-        select(func.count(FIR.id)).where(FIR.date_of_occurrence >= date_from)
+        select(func.count(FIR.id)).where(and_(*conditions))
     )
     total = total_result.scalar() or 0
 
     # By crime type
     type_result = await db.execute(
         select(FIR.crime_type, func.count(FIR.id))
-        .where(FIR.date_of_occurrence >= date_from)
+        .where(and_(*conditions))
         .group_by(FIR.crime_type)
         .order_by(func.count(FIR.id).desc())
         .limit(10)
@@ -362,7 +379,7 @@ async def _handle_statistics_query(db: AsyncSession, filters: dict, query: str):
     # By district
     district_result = await db.execute(
         select(FIR.district, func.count(FIR.id))
-        .where(FIR.date_of_occurrence >= date_from)
+        .where(and_(*conditions))
         .group_by(FIR.district)
         .order_by(func.count(FIR.id).desc())
         .limit(10)
@@ -424,7 +441,7 @@ async def _handle_general_query(query: str, db: AsyncSession):
 async def get_chat_history(
     session_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_role("constable")),
 ):
     """Get conversation history for a session."""
     result = await db.execute(

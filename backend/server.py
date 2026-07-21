@@ -2,7 +2,11 @@
 import os
 import sys
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+VENDOR_DIR = os.path.join(BASE_DIR, "vendor")
+sys.path.insert(0, BASE_DIR)
+if os.path.isdir(VENDOR_DIR):
+    sys.path.insert(0, VENDOR_DIR)
 
 import uvicorn
 

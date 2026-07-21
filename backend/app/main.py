@@ -73,11 +73,13 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS - Allow frontend access
+# JWT authentication uses an Authorization header rather than cookies, so
+# wildcard origins are safe only with credentials disabled. This keeps both
+# Catalyst development and production clients usable without a brittle origin list.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins for development
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
     expose_headers=["*"],

@@ -2,13 +2,14 @@
 import os
 import random
 import hashlib
-from datetime import datetime
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
-from typing import Optional
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.user import User
 from app.api.deps import get_current_user
+from app.db.session import get_db
 from app.schemas.crime import DeepfakeResult
+from app.services.audit import record_audit_event
 
 router = APIRouter(prefix="/deepfake", tags=["Deepfake Detection"])
 
@@ -93,6 +94,7 @@ def _analyze_media(filename: str, file_bytes: bytes) -> dict:
 @router.post("/detect", response_model=DeepfakeResult)
 async def detect_deepfake(
     file: UploadFile = File(..., description="Image or video file to analyze"),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """
@@ -126,8 +128,15 @@ async def detect_deepfake(
     if file_size == 0:
         raise HTTPException(status_code=400, detail="Empty file uploaded")
 
-    # Run analysis
+    # Run analysis and append a tamper-evident audit event.
     result = _analyze_media(file.filename, file_bytes)
+    await record_audit_event(
+        db,
+        current_user,
+        "DEEPFAKE_ANALYSIS",
+        details=f"Analyzed {file.filename} ({file_size} bytes); risk={result['risk_level']}",
+        risk_level=result["risk_level"],
+    )
 
     return DeepfakeResult(
         filename=file.filename,
