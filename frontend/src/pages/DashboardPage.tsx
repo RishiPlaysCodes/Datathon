@@ -1,15 +1,20 @@
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { crimeAPI } from '@/lib/api'
+import { useAuthStore } from '@/stores/authStore'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
-import { FileText, AlertTriangle, CheckCircle, Users, TrendingUp, MapPin } from 'lucide-react'
+import { FileText, AlertTriangle, CheckCircle, Users, TrendingUp, MapPin, Lock, Unlock } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts'
 
 const COLORS = ['#3b82f6', '#ef4444', '#f59e0b', '#10b981', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316']
 
 export function DashboardPage() {
+  const { user } = useAuthStore()
+  const [allStations, setAllStations] = useState(false)
+
   const { data: dashboard, isLoading } = useQuery({
-    queryKey: ['dashboard'],
-    queryFn: () => crimeAPI.getDashboard({ days: 180 }),
+    queryKey: ['dashboard', allStations],
+    queryFn: () => crimeAPI.getDashboard({ days: 180, all_stations: allStations }),
   })
 
   if (isLoading) {
@@ -35,10 +40,37 @@ export function DashboardPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-white">Command Center</h1>
-        <p className="text-gray-400 text-sm mt-1">Crime intelligence overview · Last 180 days</p>
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Command Center</h1>
+          <p className="text-gray-400 text-sm mt-1">Crime intelligence overview · Last 180 days</p>
+          {user?.station_id && !allStations && (
+            <p className="text-xs text-primary-400 mt-0.5">
+              📍 Showing: {user.station_id.replace(/_/g, ' ')} ({user.assigned_zone || 'All'} Zone)
+            </p>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setAllStations(false)}
+            className={`text-xs px-3 py-1.5 rounded-lg flex items-center gap-1.5 border transition-colors ${!allStations ? 'bg-primary-600 text-white border-primary-500' : 'border-dark-600 text-gray-400 hover:text-white'}`}
+          >
+            <Lock className="w-3 h-3" />My Station
+          </button>
+          <button
+            onClick={() => setAllStations(true)}
+            className={`text-xs px-3 py-1.5 rounded-lg flex items-center gap-1.5 border transition-colors ${allStations ? 'bg-orange-600 text-white border-orange-500' : 'border-dark-600 text-gray-400 hover:text-white'}`}
+          >
+            <Unlock className="w-3 h-3" />All Stations
+          </button>
+        </div>
       </div>
+      {allStations && (
+        <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-2.5 text-xs text-yellow-300 flex items-center gap-2">
+          <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
+          You are viewing FIRs across ALL stations. Access logged for audit.
+        </div>
+      )}
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">

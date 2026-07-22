@@ -55,7 +55,9 @@ async def lifespan(app: FastAPI):
                 from app.db.init_db import (
                     seed_users, seed_accused, seed_firs,
                     seed_network, seed_transactions, seed_initial_audit,
+                    seed_police_stations,
                 )
+                await seed_police_stations(db)
                 await seed_users(db)
                 accused_list = await seed_accused(db)
                 await seed_firs(db, accused_list)
@@ -155,7 +157,9 @@ async def diagnostic_status():
                 from app.db.init_db import (
                     seed_users, seed_accused, seed_firs,
                     seed_network, seed_transactions, seed_initial_audit,
+                    seed_police_stations,
                 )
+                await seed_police_stations(db)
                 await seed_users(db)
                 accused_list = await seed_accused(db)
                 await seed_firs(db, accused_list)

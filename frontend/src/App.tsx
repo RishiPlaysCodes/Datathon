@@ -18,6 +18,7 @@ import { CaseSimilarityPage } from '@/pages/CaseSimilarityPage'
 import { PolicyInsightsPage } from '@/pages/PolicyInsightsPage'
 import { PolicePortalPage } from '@/pages/PolicePortalPage'
 import { CrimeForecastPage } from '@/pages/CrimeForecastPage'
+import { FIRReportPage } from '@/pages/FIRReportPage'
 
 const ROLE_LEVEL: Record<string, number> = {
   citizen: 0,
@@ -124,6 +125,10 @@ function App() {
           <Route
             path="crime-forecast"
             element={<RoleRoute minimumRole="constable"><CrimeForecastPage /></RoleRoute>}
+          />
+          <Route
+            path="fir-report"
+            element={<RoleRoute minimumRole="constable"><FIRReportPage /></RoleRoute>}
           />
         </Route>
         <Route path="*" element={<DefaultRoute />} />

@@ -7,6 +7,8 @@ export interface User {
   role: string
   station_id?: string
   badge_number?: string
+  rank?: string
+  assigned_zone?: string
   is_active: boolean
   created_at?: string
 }

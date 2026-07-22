@@ -29,7 +29,34 @@ class FIR(Base):
     complainant_name = Column(String(255), nullable=True)
     complainant_phone = Column(String(20), nullable=True)
     complainant_email = Column(String(255), nullable=True)
+    complainant_address = Column(Text, nullable=True)
+    complainant_aadhaar = Column(String(12), nullable=True)
+    preferred_contact_time = Column(String(20), nullable=True)  # morning/afternoon/evening/anytime
+    safe_to_call = Column(Boolean, default=True)
     complainant_user_id = Column(Integer, nullable=True, index=True)  # links FIR to citizen user
+    # Suspect information (from complainant)
+    suspect_name = Column(String(255), nullable=True)
+    suspect_description = Column(Text, nullable=True)
+    suspect_count = Column(String(20), nullable=True)  # 1, 2-3, 4+, unknown
+    suspect_relationship = Column(String(100), nullable=True)
+    weapon_used = Column(String(100), nullable=True)
+    # Financial loss
+    financial_loss = Column(Boolean, default=False)
+    loss_amount = Column(Float, nullable=True)
+    loss_type = Column(String(50), nullable=True)  # cash, bank_transfer, upi, crypto, goods
+    transaction_id = Column(String(255), nullable=True)
+    # AI vs User selections
+    ai_crime_suggestion = Column(String(100), nullable=True)
+    user_crime_selection = Column(String(100), nullable=True)
+    ai_law_suggestion = Column(Text, nullable=True)  # JSON
+    user_law_selection = Column(Text, nullable=True)  # JSON
+    ai_confidence = Column(Float, nullable=True)
+    # Zone/station
+    zone = Column(String(50), nullable=True)  # South, East, West, North, Central
+    police_station_code = Column(String(20), nullable=True, index=True)
+    # AI Report
+    ai_report_generated = Column(Boolean, default=False)
+    ai_report_content = Column(Text, nullable=True)  # JSON
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
@@ -112,23 +139,51 @@ class PublicComplaint(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     complaint_number = Column(String(50), unique=True, index=True, nullable=False)
+    # Complainant details
     complainant_name = Column(String(255), nullable=False)
     complainant_phone = Column(String(20), nullable=True)
     complainant_email = Column(String(255), nullable=True)
+    complainant_address = Column(Text, nullable=True)
+    complainant_aadhaar = Column(String(12), nullable=True)
+    preferred_contact_time = Column(String(20), nullable=True)
+    safe_to_call = Column(Boolean, default=True)
+    emergency_contact_name = Column(String(255), nullable=True)
+    emergency_contact_phone = Column(String(20), nullable=True)
+    # Crime details
     description = Column(Text, nullable=False)
+    user_crime_type = Column(String(100), nullable=True)  # user's manual selection
+    user_law_sections = Column(Text, nullable=True)  # JSON: user's manual selection
     # AI-classified fields
     ai_crime_type = Column(String(100), nullable=True)
     ai_law_sections = Column(Text, nullable=True)  # JSON list
     ai_severity = Column(String(20), default="medium")
     ai_confidence = Column(Float, default=0.0)
-    law_violated = Column(Boolean, default=True)  # AI says law was violated
+    law_violated = Column(Boolean, default=True)
+    # Suspect information
+    suspect_name = Column(String(255), nullable=True)
+    suspect_description = Column(Text, nullable=True)
+    suspect_count = Column(String(20), nullable=True)
+    suspect_relationship = Column(String(100), nullable=True)
+    suspect_phone = Column(String(20), nullable=True)
+    suspect_address = Column(Text, nullable=True)
+    weapon_used = Column(String(100), nullable=True)
+    cctv_available = Column(Boolean, nullable=True)
+    # Financial loss
+    financial_loss = Column(Boolean, default=False)
+    loss_amount = Column(Float, nullable=True)
+    loss_type = Column(String(50), nullable=True)
+    bank_details = Column(Text, nullable=True)
+    transaction_id = Column(String(255), nullable=True)
+    reported_to_bank = Column(Boolean, nullable=True)
     # Status and visibility
     status = Column(String(50), default="pending")  # pending, under_review, resolved, escalated
-    is_public = Column(Boolean, default=False)  # becomes True after 7 days if unresolved
+    is_public = Column(Boolean, default=False)
     resolved_at = Column(DateTime(timezone=True), nullable=True)
     # Location
     location_name = Column(String(255), nullable=True)
     district = Column(String(100), nullable=True)
+    zone = Column(String(50), nullable=True)
+    police_station_code = Column(String(20), nullable=True)
     # Timestamps
     submitted_at = Column(DateTime(timezone=True), server_default=func.now())
     created_at = Column(DateTime(timezone=True), server_default=func.now())

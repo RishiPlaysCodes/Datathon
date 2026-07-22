@@ -34,6 +34,8 @@ class UserResponse(BaseModel):
     role: str
     station_id: Optional[str] = None
     badge_number: Optional[str] = None
+    rank: Optional[str] = None
+    assigned_zone: Optional[str] = None
     is_active: bool
     created_at: Optional[datetime] = None
 

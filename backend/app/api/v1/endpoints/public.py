@@ -177,27 +177,59 @@ def _classify_complaint(description: str) -> Dict[str, Any]:
 
 
 class PublicComplaintRequest(BaseModel):
-    complainant_name: str
-    complainant_phone: Optional[str] = None
+    # Complainant details (mandatory fields marked)
+    complainant_name: str  # mandatory
+    complainant_phone: str  # mandatory (10 digits)
     complainant_email: Optional[str] = None
-    description: str
+    complainant_address: Optional[str] = None  # mandatory in UI
+    complainant_aadhaar: Optional[str] = None  # optional, 12 digits
+    preferred_contact_time: Optional[str] = None  # morning/afternoon/evening/anytime
+    safe_to_call: Optional[bool] = True
+    emergency_contact_name: Optional[str] = None
+    emergency_contact_phone: Optional[str] = None
+    # Crime details
+    description: str  # mandatory, min 20 chars
+    crime_type: Optional[str] = None  # user manual selection (dropdown)
+    law_sections: Optional[List[str]] = None  # user manual multi-select
     location_name: Optional[str] = None
     district: Optional[str] = None
+    # Suspect information
+    suspect_name: Optional[str] = None
+    suspect_description: Optional[str] = None  # height, build, clothing, marks
+    suspect_count: Optional[str] = None  # 1, 2-3, 4+, unknown
+    suspect_relationship: Optional[str] = None
+    suspect_phone: Optional[str] = None
+    suspect_address: Optional[str] = None
+    weapon_used: Optional[str] = None  # yes-specify, no, unknown
+    cctv_available: Optional[bool] = None
+    # Financial loss
+    financial_loss: Optional[bool] = False
+    loss_amount: Optional[float] = None
+    loss_type: Optional[str] = None  # cash, bank_transfer, upi, crypto, goods
+    bank_details: Optional[str] = None
+    transaction_id: Optional[str] = None
+    reported_to_bank: Optional[bool] = None
 
 
 class PublicComplaintResponse(BaseModel):
     complaint_number: str
     status: str
+    # AI suggestion (for user to accept/reject)
     ai_crime_type: Optional[str]
     ai_law_sections: List[str]
     ai_severity: str
     ai_confidence: float
     law_violated: bool
     advisory: str
-    message: str
+    # User's final selection (if they chose manually)
+    user_crime_type: Optional[str] = None
+    user_law_sections: Optional[List[str]] = None
+    # Station assignment
     assigned_station: str
     tracking_number: str
     helpline: str
+    zone: str
+    message: str
 
 
 @router.post("/complaint", response_model=PublicComplaintResponse)
@@ -219,19 +251,54 @@ async def register_public_complaint(
     # both in the browser and on some proxies/gateways, causing track-by-number to 404.
     complaint_number = f"PUB-{datetime.now().strftime('%Y%m%d')}-{uuid.uuid4().hex[:8].upper()}"
 
+    # Auto-detect zone and station from location
+    from app.db.stations import get_zone_for_location, get_station_for_location
+    zone = get_zone_for_location(complaint.location_name or "")
+    station_code = get_station_for_location(complaint.location_name or "")
+
     record = PublicComplaint(
         complaint_number=complaint_number,
+        # Complainant
         complainant_name=complaint.complainant_name.strip(),
         complainant_phone=complaint.complainant_phone,
         complainant_email=complaint.complainant_email,
+        complainant_address=complaint.complainant_address,
+        complainant_aadhaar=complaint.complainant_aadhaar,
+        preferred_contact_time=complaint.preferred_contact_time,
+        safe_to_call=complaint.safe_to_call,
+        emergency_contact_name=complaint.emergency_contact_name,
+        emergency_contact_phone=complaint.emergency_contact_phone,
+        # Crime
         description=complaint.description.strip(),
+        user_crime_type=complaint.crime_type,
+        user_law_sections=json.dumps(complaint.law_sections) if complaint.law_sections else None,
+        # AI
         ai_crime_type=classification["crime_type"],
         ai_law_sections=json.dumps(classification["law_sections"]),
         ai_severity=classification["severity"],
         ai_confidence=classification["confidence"],
         law_violated=classification["law_violated"],
+        # Suspect
+        suspect_name=complaint.suspect_name,
+        suspect_description=complaint.suspect_description,
+        suspect_count=complaint.suspect_count,
+        suspect_relationship=complaint.suspect_relationship,
+        suspect_phone=complaint.suspect_phone,
+        suspect_address=complaint.suspect_address,
+        weapon_used=complaint.weapon_used,
+        cctv_available=complaint.cctv_available,
+        # Financial
+        financial_loss=complaint.financial_loss,
+        loss_amount=complaint.loss_amount,
+        loss_type=complaint.loss_type,
+        bank_details=complaint.bank_details,
+        transaction_id=complaint.transaction_id,
+        reported_to_bank=complaint.reported_to_bank,
+        # Location
         location_name=complaint.location_name,
         district=complaint.district or "Bengaluru Urban",
+        zone=zone,
+        police_station_code=station_code,
         status="pending",
     )
     db.add(record)
@@ -266,9 +333,12 @@ async def register_public_complaint(
         ai_confidence=classification["confidence"],
         law_violated=classification["law_violated"],
         advisory=classification["advisory"],
+        user_crime_type=complaint.crime_type,
+        user_law_sections=complaint.law_sections,
         assigned_station=assigned_station,
         tracking_number=complaint_number,
         helpline="Karnataka Police Helpline: 100 | Cyber Crime: 1930 | Women: 181",
+        zone=zone,
         message=f"Your complaint has been registered and assigned to {assigned_station}. "
                 f"Track status using your tracking number: {complaint_number}. "
                 f"Police will review within 7 days. If unresolved, it becomes publicly visible.",
