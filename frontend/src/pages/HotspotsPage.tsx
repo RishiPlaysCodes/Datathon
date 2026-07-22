@@ -17,6 +17,7 @@ export function HotspotsPage() {
     queryFn: () => crimeAPI.getHotspots({
       crime_type: crimeType || undefined,
       days,
+      all_stations: true,
     }),
   })
 
