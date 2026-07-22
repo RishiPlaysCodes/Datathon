@@ -12,6 +12,9 @@ import { AccusedPage } from '@/pages/AccusedPage'
 import { AnalyticsPage } from '@/pages/AnalyticsPage'
 import { AuditPage } from '@/pages/AuditPage'
 import { DeepfakePage } from '@/pages/DeepfakePage'
+import { PublicPortalPage } from '@/pages/PublicPortalPage'
+import { CCTVPage } from '@/pages/CCTVPage'
+import { CaseSimilarityPage } from '@/pages/CaseSimilarityPage'
 
 const ROLE_LEVEL: Record<string, number> = {
   citizen: 0,
@@ -57,6 +60,8 @@ function App() {
         }}
       />
       <Routes>
+        {/* Public portal — NO LOGIN REQUIRED */}
+        <Route path="/public" element={<PublicPortalPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route
           path="/"
@@ -96,6 +101,14 @@ function App() {
           <Route
             path="audit"
             element={<RoleRoute minimumRole="supervisor"><AuditPage /></RoleRoute>}
+          />
+          <Route
+            path="cctv"
+            element={<RoleRoute minimumRole="constable"><CCTVPage /></RoleRoute>}
+          />
+          <Route
+            path="case-similarity"
+            element={<RoleRoute minimumRole="constable"><CaseSimilarityPage /></RoleRoute>}
           />
         </Route>
         <Route path="*" element={<DefaultRoute />} />

@@ -102,3 +102,31 @@ class Transaction(Base):
     is_suspicious = Column(Boolean, default=False)
     fir_id = Column(Integer, nullable=True)
     notes = Column(Text, nullable=True)
+
+
+class PublicComplaint(Base):
+    """Public-facing complaint submitted without login. Becomes visible publicly after 7 days if unresolved."""
+    __tablename__ = "public_complaints"
+
+    id = Column(Integer, primary_key=True, index=True)
+    complaint_number = Column(String(50), unique=True, index=True, nullable=False)
+    complainant_name = Column(String(255), nullable=False)
+    complainant_phone = Column(String(20), nullable=True)
+    complainant_email = Column(String(255), nullable=True)
+    description = Column(Text, nullable=False)
+    # AI-classified fields
+    ai_crime_type = Column(String(100), nullable=True)
+    ai_law_sections = Column(Text, nullable=True)  # JSON list
+    ai_severity = Column(String(20), default="medium")
+    ai_confidence = Column(Float, default=0.0)
+    law_violated = Column(Boolean, default=True)  # AI says law was violated
+    # Status and visibility
+    status = Column(String(50), default="pending")  # pending, under_review, resolved, escalated
+    is_public = Column(Boolean, default=False)  # becomes True after 7 days if unresolved
+    resolved_at = Column(DateTime(timezone=True), nullable=True)
+    # Location
+    location_name = Column(String(255), nullable=True)
+    district = Column(String(100), nullable=True)
+    # Timestamps
+    submitted_at = Column(DateTime(timezone=True), server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())

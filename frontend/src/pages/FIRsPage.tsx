@@ -46,11 +46,12 @@ export function FIRsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-white">
-          {isCitizen ? 'My FIR Complaints' : 'FIR Records'}
-        </h1>
-        <p className="text-gray-400 text-sm mt-1">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-white">
+            {isCitizen ? 'My FIR Complaints' : 'FIR Records'}
+          </h1>
+          <p className="text-gray-400 text-sm mt-1">
           {isCitizen
             ? 'Track the status of your filed complaints'
             : 'Browse and search First Information Reports'}
@@ -62,8 +63,18 @@ export function FIRsPage() {
           </div>
         )}
       </div>
-
-      {/* Filters */}
+      <button
+        onClick={() => {
+          import('@/lib/pdfExport').then(({ exportToPdf, arrayToTable }) => {
+            const rows = data?.firs?.map(f => ({ 'FIR #': f.fir_number, Type: f.crime_type, Location: f.location_name, Status: f.status, Date: f.date_of_occurrence?.split('T')[0] })) || []
+            exportToPdf({ title: 'FIR Records Report', subtitle: `Total: ${data?.total || 0} records`, content: arrayToTable(rows, 'FIR Records') })
+          })
+        }}
+        className="text-xs px-3 py-1.5 rounded-lg border border-dark-600 text-gray-400 hover:text-white hover:border-primary-500/50 transition-colors"
+      >
+        Export PDF
+      </button>
+      </div>
       <div className="glass-card p-4">
         <div className="flex flex-wrap gap-3">
           <div className="flex-1 min-w-[200px] relative">

@@ -1,7 +1,8 @@
 import { NavLink } from 'react-router-dom'
 import {
   MessageSquare, LayoutDashboard, Network, Map, Users,
-  Shield, FileText, TrendingUp, LogOut, Activity, ScanSearch
+  Shield, FileText, TrendingUp, LogOut, Activity, ScanSearch,
+  Camera, GitCompare
 } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 
@@ -10,6 +11,8 @@ const allNavItems = [
   { to: '/chat', icon: MessageSquare, label: 'AI Chat', minRole: 'constable' },
   { to: '/firs', icon: FileText, label: 'FIR Records', minRole: 'citizen' },
   { to: '/deepfake', icon: ScanSearch, label: 'Deepfake Detect', minRole: 'citizen' },
+  { to: '/cctv', icon: Camera, label: 'CCTV Match', minRole: 'constable' },
+  { to: '/case-similarity', icon: GitCompare, label: 'Case Similarity', minRole: 'constable' },
   { to: '/network', icon: Network, label: 'Network Graph', minRole: 'constable' },
   { to: '/hotspots', icon: Map, label: 'Hotspot Map', minRole: 'constable' },
   { to: '/accused', icon: Users, label: 'Accused', minRole: 'constable' },
