@@ -133,6 +133,54 @@ class Transaction(Base):
     notes = Column(Text, nullable=True)
 
 
+class Evidence(Base):
+    """Evidence files attached to a FIR."""
+    __tablename__ = "evidence"
+
+    id = Column(Integer, primary_key=True, index=True)
+    fir_id = Column(Integer, nullable=False, index=True)
+    filename = Column(String(255), nullable=False)
+    file_type = Column(String(50), nullable=False)  # photo, video, document, audio
+    file_size = Column(Integer, nullable=False)
+    mime_type = Column(String(100), nullable=True)
+    description = Column(Text, nullable=True)
+    uploaded_by = Column(Integer, nullable=False)  # user_id
+    uploaded_by_name = Column(String(255), nullable=True)
+    # We store file content as base64 in SQLite (no external storage on Catalyst free tier)
+    file_data = Column(Text, nullable=True)  # base64 encoded (for small files)
+    chain_of_custody = Column(Text, nullable=True)  # JSON log
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class InvestigationChecklist(Base):
+    """Auto-generated investigation checklist items per FIR."""
+    __tablename__ = "investigation_checklist"
+
+    id = Column(Integer, primary_key=True, index=True)
+    fir_id = Column(Integer, nullable=False, index=True)
+    item_text = Column(String(500), nullable=False)
+    is_completed = Column(Boolean, default=False)
+    completed_by = Column(String(255), nullable=True)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+    notes = Column(Text, nullable=True)
+    order_index = Column(Integer, default=0)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class OfficerNote(Base):
+    """Free-text notes added by officers to a FIR."""
+    __tablename__ = "officer_notes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    fir_id = Column(Integer, nullable=False, index=True)
+    user_id = Column(Integer, nullable=False)
+    officer_name = Column(String(255), nullable=False)
+    officer_role = Column(String(50), nullable=True)
+    content = Column(Text, nullable=False)
+    note_type = Column(String(50), default="general")  # general, status_update, evidence, lead
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
 class PublicComplaint(Base):
     """Public-facing complaint submitted without login. Becomes visible publicly after 7 days if unresolved."""
     __tablename__ = "public_complaints"
