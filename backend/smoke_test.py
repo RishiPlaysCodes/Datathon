@@ -444,13 +444,61 @@ class SmokeTest:
 
         self.check("AI intent, grounded response, and chat history", chat_and_history)
 
+        def chat_help_and_hinglish():
+            # A features/help question must be answered, never dead-ended.
+            help_chat = self.expect_json(
+                self.request("POST", "ai/chat", token=token, json_body={"message": "what features do you have"})
+            )
+            self.require(help_chat.get("intent") in ("help", "general"), f"help intent misrouted: {help_chat.get('intent')}")
+            self.require("PRAHARI" in (help_chat.get("response") or ""), "help response is not the capability guide")
+            self.require(help_chat.get("confidence", 0) >= 0.5, "help confidence too low")
+            # Hinglish query must classify correctly, not fall back to general.
+            hinglish = self.expect_json(
+                self.request("POST", "ai/chat", token=token, json_body={"message": "chori ke case dikhao"})
+            )
+            self.require(hinglish.get("intent") == "search_firs", f"Hinglish query misrouted: {hinglish.get('intent')}")
+
+        self.check("AI handles help/features and Hinglish queries", chat_help_and_hinglish)
+
         def deepfake_valid():
             data = self.expect_json(self.upload("demo", "evidence.png", TINY_PNG, "image/png"))
             self.require(data.get("filename") == "evidence.png", "deepfake result filename mismatch")
             self.require(0 <= data.get("confidence", -1) <= 1, "deepfake confidence is out of range")
             self.require(data.get("recommendations"), "deepfake recommendations missing")
+            self.require(bool(data.get("analysis_details")), "deepfake analysis details missing")
 
         self.check("Deepfake valid image upload", deepfake_valid)
+
+        def deepfake_detects_ai_image():
+            # A PNG carrying a Stable Diffusion generation signature must be flagged
+            # by the real byte-level forensic engine (not random).
+            ai_png = (
+                b"\x89PNG\r\n\x1a\n\x00\x00\x00\x0dIHDR"
+                + (512).to_bytes(4, "big") + (512).to_bytes(4, "big")
+                + b"\x08\x06\x00\x00\x00"
+                + b"tEXtparameters Stable Diffusion, sampler DPM++ 2M, model v1-5 "
+                + b"\x00" * 2048
+            )
+            data = self.expect_json(self.upload("demo", "generated.png", ai_png, "image/png"))
+            self.require(data.get("is_deepfake") is True, "AI-generated image was not flagged as manipulated")
+            self.require(data.get("confidence", 0) >= 0.6, "AI-image confidence too low")
+            self.require(
+                "stable diffusion" in str(data.get("analysis_details", {}).get("ai_generator_signatures", "")).lower(),
+                "AI-generation signature was not surfaced",
+            )
+
+        self.check("Deepfake real analysis flags AI-generated image", deepfake_detects_ai_image)
+
+        def deepfake_deterministic():
+            # Same bytes must always yield the same verdict (auditable, not random).
+            first = self.expect_json(self.upload("demo", "same.png", TINY_PNG, "image/png"))
+            second = self.expect_json(self.upload("demo", "same.png", TINY_PNG, "image/png"))
+            self.require(
+                first.get("confidence") == second.get("confidence"),
+                "deepfake analysis is not deterministic for identical files",
+            )
+
+        self.check("Deepfake analysis is deterministic", deepfake_deterministic)
 
         def deepfake_invalid():
             response = self.upload("demo", "evidence.txt", b"not media", "text/plain")
