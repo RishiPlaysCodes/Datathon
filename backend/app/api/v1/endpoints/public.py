@@ -131,7 +131,11 @@ CRIME_KEYWORDS = {
 
 
 def _classify_complaint(description: str) -> Dict[str, Any]:
-    """AI-classify a complaint: detect crime type, applicable laws, severity."""
+    """AI-classify a complaint: detect crime type, applicable laws, severity.
+    
+    Includes POCSO/minor detection: if a minor is mentioned, auto-escalates
+    to CRITICAL priority with POCSO Act sections and blocks public visibility.
+    """
     desc_lower = description.lower()
     scores = {}
     for crime_type, keywords in CRIME_KEYWORDS.items():
@@ -139,6 +143,114 @@ def _classify_complaint(description: str) -> Dict[str, Any]:
         if score > 0:
             scores[crime_type] = score
 
+    # ─── POCSO / MINOR DETECTION ───
+    # Detect if a minor (under 18) is mentioned in the complaint.
+    minor_detected = False
+    minor_age = None
+    
+    # Age patterns: "12-year-old", "12 year old", "age 12", "aged 14", "minor", "child", "baccha"
+    import re as _re
+    age_patterns = [
+        r"(\d{1,2})\s*[-–]?\s*year\s*[-–]?\s*old",
+        r"age[d]?\s*(\d{1,2})",
+        r"(\d{1,2})\s*saal\s*k[aie]",
+        r"(\d{1,2})\s*varsh",
+    ]
+    for pattern in age_patterns:
+        match = _re.search(pattern, desc_lower)
+        if match:
+            age = int(match.group(1))
+            if age < 18:
+                minor_detected = True
+                minor_age = age
+                break
+    
+    # Keyword-based minor detection
+    minor_keywords = ["minor", "child", "baccha", "bachchi", "underage", "juvenile",
+                      "school girl", "school boy", "infant", "toddler", "teenager",
+                      "pocso", "makkalu", "ಮಕ್ಕಳು", "ಮಗು"]
+    if not minor_detected:
+        if any(kw in desc_lower for kw in minor_keywords):
+            minor_detected = True
+
+    # ─── POCSO CASE HANDLING ───
+    if minor_detected:
+        # Determine specific POCSO section based on description content
+        pocso_sections = ["POCSO Act 2012 — Section 7 (Sexual Assault on Minor)"]
+        
+        has_penetration = any(w in desc_lower for w in ["rape", "penetrat", "intercourse", "376"])
+        has_pornography = any(w in desc_lower for w in ["pornograph", "nude", "obscene", "video", "photo", "record"])
+        has_trafficking = any(w in desc_lower for w in ["traffick", "sell", "prostitut", "exploit"])
+        
+        if has_penetration:
+            pocso_sections = [
+                "POCSO Act 2012 — Section 3/4 (Penetrative Sexual Assault on Minor)",
+                "376 IPC (Rape) / 63 BNS (Rape)",
+            ]
+        if has_pornography:
+            pocso_sections.append("POCSO Act 2012 — Section 13/14 (Use of Child for Pornographic Purposes)")
+        if has_trafficking:
+            pocso_sections.append("POCSO Act 2012 — Section 5 (Aggravated Penetrative Sexual Assault)")
+            pocso_sections.append("Immoral Traffic Prevention Act (ITPA)")
+        
+        # Always add IPC/BNS for assault on minor
+        if not has_penetration:
+            pocso_sections.append("354 IPC (Assault/Criminal Force to Woman) / 74 BNS")
+        
+        pocso_sections.append("Section 75 Juvenile Justice Act (Cruelty to Child)")
+        
+        age_text = f" (victim age: {minor_age})" if minor_age else ""
+        
+        return {
+            "crime_type": "child abuse / POCSO",
+            "law_sections": pocso_sections,
+            "severity": "critical",
+            "confidence": 0.95,
+            "law_violated": True,
+            "is_pocso": True,
+            "minor_detected": True,
+            "minor_age": minor_age,
+            "never_public": True,
+            "advisory": (
+                f"🔴 MINOR INVOLVED — POCSO MANDATORY{age_text}. "
+                f"This case is auto-escalated to CRITICAL priority. "
+                f"Applicable: {'; '.join(pocso_sections[:2])}. "
+                f"Case will NEVER be publicly visible. Supervisor auto-alerted."
+            ),
+            "supervisor_alert": {
+                "type": "POCSO_CRITICAL",
+                "message": f"CRITICAL: POCSO case registered. Minor victim{age_text}. Immediate review required.",
+                "priority": "IMMEDIATE",
+            },
+        }
+
+    # ─── SEXUAL OFFENSE (ADULT) — careful section assignment ───
+    if scores and max(scores, key=scores.get) == "sexual offense":
+        has_rape = any(w in desc_lower for w in ["rape", "penetrat", "intercourse", "forced sex"])
+        if has_rape:
+            law_sections = [
+                "376 IPC (Rape) / 63 BNS (Rape)",
+                "354 IPC (Assault/Criminal Force to Woman) / 74 BNS",
+            ]
+        else:
+            # Molestation/assault without penetration — do NOT cite 376
+            law_sections = [
+                "354 IPC (Assault/Criminal Force to Woman) / 74 BNS",
+                "354A IPC (Sexual Harassment) / 75 BNS",
+            ]
+        return {
+            "crime_type": "sexual offense",
+            "law_sections": law_sections,
+            "severity": "critical",
+            "confidence": min(0.5 + 0.15 * scores.get("sexual offense", 1), 0.95),
+            "law_violated": True,
+            "is_pocso": False,
+            "minor_detected": False,
+            "never_public": False,
+            "advisory": f"AI detected potential 'sexual offense' — applicable sections: {'; '.join(law_sections)}",
+        }
+
+    # ─── STANDARD CLASSIFICATION ───
     if not scores:
         return {
             "crime_type": "general complaint",
@@ -146,6 +258,9 @@ def _classify_complaint(description: str) -> Dict[str, Any]:
             "severity": "low",
             "confidence": 0.3,
             "law_violated": False,
+            "is_pocso": False,
+            "minor_detected": False,
+            "never_public": False,
             "advisory": "No specific law violation detected by AI. Your complaint will still be reviewed by officers.",
         }
 
@@ -172,6 +287,9 @@ def _classify_complaint(description: str) -> Dict[str, Any]:
         "severity": severity,
         "confidence": confidence,
         "law_violated": True,
+        "is_pocso": False,
+        "minor_detected": False,
+        "never_public": False,
         "advisory": f"AI detected potential '{best_type}' — applicable sections: {', '.join(law_sections)}",
     }
 
@@ -230,6 +348,12 @@ class PublicComplaintResponse(BaseModel):
     helpline: str
     zone: str
     message: str
+    # POCSO/Minor detection
+    is_pocso: bool = False
+    minor_detected: bool = False
+    minor_age: Optional[int] = None
+    never_public: bool = False
+    supervisor_alert: Optional[Dict[str, Any]] = None
 
 
 @router.post("/complaint", response_model=PublicComplaintResponse)
@@ -300,6 +424,8 @@ async def register_public_complaint(
         zone=zone,
         police_station_code=station_code,
         status="pending",
+        # POCSO: if minor involved, NEVER make public
+        is_public=False,  # always start private; POCSO cases stay private forever
     )
     db.add(record)
     await db.commit()
@@ -324,6 +450,22 @@ async def register_public_complaint(
             assigned_station = station
             break
 
+    # POCSO-specific message override
+    is_pocso = classification.get("is_pocso", False)
+    if is_pocso:
+        final_message = (
+            f"🔴 CRITICAL POCSO CASE REGISTERED. Assigned to {assigned_station}. "
+            f"Tracking: {complaint_number}. "
+            f"🔒 RESTRICTED — Minor Involved. This case will NEVER be publicly visible. "
+            f"Supervisor has been auto-alerted for immediate review."
+        )
+    else:
+        final_message = (
+            f"Your complaint has been registered and assigned to {assigned_station}. "
+            f"Track status using your tracking number: {complaint_number}. "
+            f"Police will review within 7 days. If unresolved, it becomes publicly visible."
+        )
+
     return PublicComplaintResponse(
         complaint_number=complaint_number,
         status="pending",
@@ -337,11 +479,14 @@ async def register_public_complaint(
         user_law_sections=complaint.law_sections,
         assigned_station=assigned_station,
         tracking_number=complaint_number,
-        helpline="Karnataka Police Helpline: 100 | Cyber Crime: 1930 | Women: 181",
+        helpline="Karnataka Police Helpline: 100 | Cyber Crime: 1930 | Women: 181 | Child: 1098 (CHILDLINE)",
         zone=zone,
-        message=f"Your complaint has been registered and assigned to {assigned_station}. "
-                f"Track status using your tracking number: {complaint_number}. "
-                f"Police will review within 7 days. If unresolved, it becomes publicly visible.",
+        message=final_message,
+        is_pocso=is_pocso,
+        minor_detected=classification.get("minor_detected", False),
+        minor_age=classification.get("minor_age"),
+        never_public=classification.get("never_public", False),
+        supervisor_alert=classification.get("supervisor_alert"),
     )
 
 
@@ -349,7 +494,9 @@ async def register_public_complaint(
 async def list_public_complaints(
     db: AsyncSession = Depends(get_db),
 ):
-    """List complaints that are publicly visible (unresolved after 7 days)."""
+    """List complaints that are publicly visible (unresolved after 7 days).
+    POCSO/minor cases are NEVER shown publicly regardless of time elapsed.
+    """
     seven_days_ago = datetime.now() - timedelta(days=7)
     result = await db.execute(
         select(PublicComplaint)
@@ -357,6 +504,8 @@ async def list_public_complaints(
             and_(
                 PublicComplaint.submitted_at <= seven_days_ago,
                 PublicComplaint.status.in_(["pending", "under_review"]),
+                # POCSO/child abuse cases are NEVER publicly visible
+                PublicComplaint.ai_crime_type != "child abuse / POCSO",
             )
         )
         .order_by(PublicComplaint.submitted_at.desc())
