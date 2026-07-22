@@ -666,7 +666,7 @@ async def convert_complaint_to_fir(
         raise HTTPException(status_code=404, detail="Complaint not found")
 
     law_sections = json.loads(complaint.ai_law_sections) if complaint.ai_law_sections else []
-    fir_number = f"KSP/BEN/{datetime.now().strftime('%Y')}/{complaint.id:04d}"
+    fir_number = f"KSP/BEN/{datetime.now().strftime('%Y')}/{1000 + complaint.id:04d}"
 
     # Auto-assign to the officer's station (who is converting), not generic "PUB-INTAKE"
     officer_station = current_user.station_id or complaint.police_station_code or "BLR_CYB_PS"
