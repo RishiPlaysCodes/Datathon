@@ -277,7 +277,7 @@ async def list_public_complaints(
     ]
 
 
-@router.get("/complaint/{complaint_number}")
+@router.get("/complaint/{complaint_number:path}")
 async def track_complaint(
     complaint_number: str,
     db: AsyncSession = Depends(get_db),
