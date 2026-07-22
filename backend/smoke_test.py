@@ -460,6 +460,46 @@ class SmokeTest:
 
         self.check("AI handles help/features and Hinglish queries", chat_help_and_hinglish)
 
+        def chat_kannada():
+            # Kannada (native script) must route correctly, not fall back to general.
+            kn = self.expect_json(
+                self.request("POST", "ai/chat", token=token, json_body={"message": "\u0c95\u0cb3\u0ccd\u0cb3\u0ca4\u0ca8 \u0caa\u0ccd\u0cb0\u0c95\u0cb0\u0ca3 \u0ca4\u0ccb\u0cb0\u0cbf\u0cb8\u0cc1"})
+            )
+            self.require(kn.get("intent") == "search_firs", f"Kannada query misrouted: {kn.get('intent')}")
+
+        self.check("AI handles Kannada queries", chat_kannada)
+
+        def chat_multiturn_refinement():
+            # Start a search, then refine it with a follow-up; context must carry.
+            session = f"smoke-mt-{uuid.uuid4().hex[:8]}"
+            first = self.expect_json(
+                self.request(
+                    "POST", "ai/chat", token=token,
+                    json_body={"message": "show theft cases in Bangalore", "session_id": session},
+                )
+            )
+            self.require(first.get("intent") == "search_firs", "multi-turn base query misrouted")
+            follow = self.expect_json(
+                self.request(
+                    "POST", "ai/chat", token=token,
+                    json_body={"message": "only female victims", "session_id": session},
+                )
+            )
+            # "only female victims" alone classifies as 'general'; multi-turn
+            # context must restore the previous search_firs intent.
+            self.require(follow.get("intent") == "search_firs", f"multi-turn refinement lost context: {follow.get('intent')}")
+
+        self.check("AI multi-turn context (follow-up refinement)", chat_multiturn_refinement)
+
+        def chat_gender_filter():
+            # The gender filter must actually be applied (previously dead code).
+            result = self.expect_json(
+                self.request("POST", "ai/chat", token=token, json_body={"message": "show cases with female victims"})
+            )
+            self.require(result.get("intent") == "search_firs", "gender-filtered search misrouted")
+
+        self.check("AI gender filter on victims", chat_gender_filter)
+
         def deepfake_valid():
             data = self.expect_json(self.upload("demo", "evidence.png", TINY_PNG, "image/png"))
             self.require(data.get("filename") == "evidence.png", "deepfake result filename mismatch")
@@ -525,6 +565,7 @@ class SmokeTest:
             actions = {item.get("action") for item in data}
             self.require("AI_QUERY" in actions, "AI query was not written to the audit trail")
             self.require("DEEPFAKE_ANALYSIS" in actions, "deepfake analysis was not written to the audit trail")
+            self.require("LOGIN" in actions, "login events were not written to the audit trail")
 
             # Verify the tamper-evident chain: entries are returned newest-first,
             # so each entry's previous_hash must equal the next-older entry_hash.

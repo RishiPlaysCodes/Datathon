@@ -16,6 +16,9 @@ INTENT_PATTERNS = {
         # Hinglish
         r"dikhao", r"dikha\s?do", r"batao.*case", r"case.*batao",
         r"chori", r"loot", r"hatya", r"katal", r"jurm", r"apradh", r"mamla",
+        # Kannada (romanized + script)
+        r"torisu", r"tori\b", r"prakarana", r"kallatana", r"aparadha",
+        r"ತೋರಿಸು", r"ಪ್ರಕರಣ", r"ಕಳ್ಳತನ", r"ಅಪರಾಧ", r"ಪ್ರಕರಣಗಳು",
     ],
     "accused_info": [
         r"accused", r"offender", r"criminal", r"suspect",
@@ -24,6 +27,8 @@ INTENT_PATTERNS = {
         # Hinglish
         r"aaropi", r"mulzim", r"apradhi", r"kaun\s+hai",
         r"ke\s+baare\s+me", r"ki\s+jaankari", r"badmaash", r"gunehgar",
+        # Kannada
+        r"aaropi", r"aparadhi", r"yaaru", r"ಆರೋಪಿ", r"ಯಾರು", r"ಅಪರಾಧಿ",
     ],
     "network_analysis": [
         r"network", r"connect", r"associate", r"gang",
@@ -32,6 +37,8 @@ INTENT_PATTERNS = {
         # Hinglish
         r"giroh", r"saathi", r"juda", r"jude\s+hue", r"rishta",
         r"sambandh", r"connection.*dikha",
+        # Kannada
+        r"gumpu", r"jaala", r"sambandha", r"ಗುಂಪು", r"ಜಾಲ", r"ಸಂಬಂಧ",
     ],
     "hotspot_analysis": [
         r"hotspot", r"heatmap", r"heat\s+map", r"map",
@@ -40,6 +47,9 @@ INTENT_PATTERNS = {
         # Hinglish
         r"kahan.*crime", r"kahan.*jurm", r"khatarnak\s+ilaka",
         r"unsafe\s+area", r"kaunsi\s+jagah", r"ilaka", r"map.*dikha",
+        # Kannada
+        r"elli.*apradha", r"pradesha", r"apayakari", r"nakshe",
+        r"ಎಲ್ಲಿ", r"ಪ್ರದೇಶ", r"ನಕ್ಷೆ", r"ಅಪಾಯಕಾರಿ",
     ],
     "risk_assessment": [
         r"risk", r"danger", r"threat", r"score",
@@ -48,6 +58,8 @@ INTENT_PATTERNS = {
         # Hinglish
         r"khatra", r"kitna\s+khatarnak", r"jokhim", r"khatarnaak",
         r"risk\s+score", r"kitna\s+risk",
+        # Kannada  (apaya = risk/danger noun; apayakari "dangerous" -> hotspot)
+        r"\bapaya\b", r"ಅಪಾಯ\b", r"ರಿಸ್ಕ್",
     ],
     "statistics": [
         r"statistic", r"trend", r"count", r"total",
@@ -56,6 +68,8 @@ INTENT_PATTERNS = {
         # Hinglish
         r"kitne", r"kitna", r"aankde", r"ginti", r"total\s+kitne",
         r"summary\s+do", r"trend.*dikha", r"tulna",
+        # Kannada
+        r"eshtu", r"estu", r"ankiamsha", r"maahiti", r"ಎಷ್ಟು", r"ಅಂಕಿಅಂಶ", r"ಸಾರಾಂಶ",
     ],
     "help": [
         r"help", r"what\s+can\s+you\s+do", r"capabilit", r"features?",
@@ -64,10 +78,14 @@ INTENT_PATTERNS = {
         # Hinglish
         r"kya\s+kar\s+sakte", r"kaise\s+use", r"kaun\s?kaun\s?se",
         r"kaunse\s+features?", r"kya\s+features?", r"madad", r"kaise\s+kaam",
+        # Kannada
+        r"sahaya", r"enu\s+madabahudu", r"vaishishtya", r"ಸಹಾಯ", r"ಸೌಲಭ್ಯ", r"ಏನು\s+ಮಾಡಬಹುದು",
     ],
     "greeting": [
         r"^\s*(hi|hello|hey|hii+|yo)\b", r"namaste", r"namaskar",
         r"good\s+(morning|afternoon|evening)", r"kaise\s+ho", r"kya\s+haal",
+        # Kannada
+        r"namaskara", r"hegiddira", r"hegiddiya", r"ನಮಸ್ಕಾರ", r"ಹೇಗಿದ್ದೀರಿ", r"ಹೇಗಿದೀಯ",
     ],
 }
 
@@ -84,19 +102,19 @@ LOCATIONS = [
 
 # Crime type patterns
 CRIME_TYPES = {
-    "chain snatching": ["chain.?snatch", "gold.?snatch", "necklace.?theft", "chain.?cheen"],
-    "theft": ["theft", "steal", "stole", "stolen", "larceny", "chori"],
-    "robbery": ["robbery", "robbed", "dacoity", "loot", "lut"],
-    "murder": ["murder", "homicide", "kill", "dead body", "hatya", "katal", "khoon"],
-    "assault": ["assault", "attack", "beat", "hurt", "grievous", "maar.?peet", "hamla"],
-    "burglary": ["burglary", "break.?in", "house.?break", "sendh"],
-    "fraud": ["fraud", "cheat", "scam", "swindle", "forgery", "dhokha", "thagi"],
-    "cyber crime": ["cyber", "online.?fraud", "hacking", "phishing"],
-    "domestic violence": ["domestic", "dowry", "wife.?beat", "cruelty", "dahej", "ghareloo"],
-    "vehicle theft": ["vehicle.?theft", "bike.?theft", "car.?theft", "auto.?theft", "gaadi.?chori"],
-    "drug offense": ["drug", "narcotic", "ndps", "ganja", "cocaine", "nasha"],
-    "sexual offense": ["rape", "molest", "sexual", "eve.?teas", "chhed"],
-    "kidnapping": ["kidnap", "abduct", "missing.?person", "apahran"],
+    "chain snatching": ["chain.?snatch", "gold.?snatch", "necklace.?theft", "chain.?cheen", "sarapali", "ಸರಪಳಿ"],
+    "theft": ["theft", "steal", "stole", "stolen", "larceny", "chori", "kallatana", "ಕಳ್ಳತನ"],
+    "robbery": ["robbery", "robbed", "dacoity", "loot", "lut", "darode", "ದರೋಡೆ"],
+    "murder": ["murder", "homicide", "kill", "dead body", "hatya", "katal", "khoon", "kole", "ಕೊಲೆ"],
+    "assault": ["assault", "attack", "beat", "hurt", "grievous", "maar.?peet", "hamla", "halle", "ಹಲ್ಲೆ"],
+    "burglary": ["burglary", "break.?in", "house.?break", "sendh", "mane\s+kannu", "ಕನ್ನ"],
+    "fraud": ["fraud", "cheat", "scam", "swindle", "forgery", "dhokha", "thagi", "vanchane", "mosa", "ವಂಚನೆ", "ಮೋಸ"],
+    "cyber crime": ["cyber", "online.?fraud", "hacking", "phishing", "ಸೈಬರ್"],
+    "domestic violence": ["domestic", "dowry", "wife.?beat", "cruelty", "dahej", "ghareloo", "vara.?dakshine", "ಕೌಟುಂಬಿಕ"],
+    "vehicle theft": ["vehicle.?theft", "bike.?theft", "car.?theft", "auto.?theft", "gaadi.?chori", "vahana.?kalla", "ವಾಹನ.?ಕಳ್ಳತನ"],
+    "drug offense": ["drug", "narcotic", "ndps", "ganja", "cocaine", "nasha", "madaka", "ಮಾದಕ"],
+    "sexual offense": ["rape", "molest", "sexual", "eve.?teas", "chhed", "atyachara", "ಅತ್ಯಾಚಾರ"],
+    "kidnapping": ["kidnap", "abduct", "missing.?person", "apahran", "apaharana", "ಅಪಹರಣ"],
 }
 
 
@@ -151,6 +169,39 @@ def classify_intent(query: str) -> Dict[str, Any]:
     }
 
 
+# Words that signal the user is refining the PREVIOUS query rather than
+# starting a fresh one (e.g. "now only female", "sirf open cases", "adike hennu").
+REFINEMENT_HINTS = [
+    "only", "just", "instead", "filter", "narrow", "in these", "in those",
+    "of these", "from these", "now show", "now only",
+    # Hinglish
+    "sirf", "keval", "kevala", "bas", "isme se", "usme se", "inme se", "ab ",
+    "wahi", "yehi", "isi me",
+    # Kannada
+    "matra", "kevala", "adralli", "idralli", "ಮಾತ್ರ", "ಕೇವಲ", "ಅದರಲ್ಲಿ",
+]
+
+
+def is_refinement(query: str) -> bool:
+    """True if the message looks like a follow-up refinement of the prior query."""
+    q = query.lower().strip()
+    words = q.split()
+    if any(hint in q for hint in REFINEMENT_HINTS):
+        return True
+    # Very short messages that only carry a filter (e.g. "female", "open cases",
+    # "closed", "mahila") are treated as refinements of the previous turn.
+    if len(words) <= 3 and any(
+        token in q
+        for token in [
+            "female", "male", "women", "men", "open", "closed", "solved", "pending",
+            "mahila", "purush", "aurat", "aadmi", "khula", "band", "hennu", "gandu",
+            "repeat", "aadatan",
+        ]
+    ):
+        return True
+    return False
+
+
 def extract_filters(query: str) -> Dict[str, Any]:
     """Extract structured filters while preserving original case for names."""
     filters = {}
@@ -181,15 +232,27 @@ def extract_filters(query: str) -> Dict[str, Any]:
         (r"3\s+months?", lambda m: 90),
     ]
 
-    for pattern, days_func in time_patterns:
+    # Hinglish/Kannada time phrases
+    hinglish_time = [
+        (r"pichhle\s+(\d+)\s+mahin", lambda m: int(m.group(1)) * 30),
+        (r"pichhle\s+(\d+)\s+din", lambda m: int(m.group(1))),
+        (r"pichhle\s+(\d+)\s+saal", lambda m: int(m.group(1)) * 365),
+        (r"is\s+mahine", lambda m: 30),
+        (r"is\s+hafte", lambda m: 7),
+        (r"aaj", lambda m: 1),
+        (r"kalla?\s+(\d+)\s+tingal", lambda m: int(m.group(1)) * 30),  # Kannada: tingalu=month
+        (r"i\s+tingalu", lambda m: 30),
+    ]
+    for pattern, days_func in time_patterns + hinglish_time:
         match = re.search(pattern, query_lower)
         if match:
             filters["days"] = days_func(match)
             break
-    if "days" not in filters:
-        filters["days"] = 180
+    # NOTE: we intentionally do NOT set a default "days" here. Handlers apply
+    # their own default (180). Leaving it unset lets multi-turn follow-ups
+    # (e.g. "ab sirf female") keep the previous turn's time window.
 
-    if any(word in query_lower for word in ["repeat", "habitual", "serial", "recidivist"]):
+    if any(word in query_lower for word in ["repeat", "habitual", "serial", "recidivist", "aadatan", "ಪುನರಾವರ್ತಿತ"]):
         filters["repeat_offenders"] = True
 
     name_patterns = [
@@ -205,14 +268,14 @@ def extract_filters(query: str) -> Dict[str, Any]:
                 filters["name"] = name
                 break
 
-    if any(word in query_lower for word in ["female", "women", "woman"]):
+    if any(word in query_lower for word in ["female", "women", "woman", "mahila", "aurat", "hennu", "ಹೆಣ್ಣು", "ಮಹಿಳೆ"]):
         filters["gender"] = "female"
-    elif any(word in query_lower for word in ["male", "men", "man"]):
+    elif any(word in query_lower for word in ["male", "men", "man", "purush", "aadmi", "gandu", "ಗಂಡು", "ಪುರುಷ"]):
         filters["gender"] = "male"
 
-    if any(word in query_lower for word in ["open", "active", "pending"]):
+    if any(word in query_lower for word in ["open", "active", "pending", "khula", "band nahi", "ತೆರೆದ"]):
         filters["status"] = "open"
-    elif any(word in query_lower for word in ["closed", "solved"]):
+    elif any(word in query_lower for word in ["closed", "solved", "band", "suljha", "ಮುಚ್ಚಿದ"]):
         filters["status"] = "closed"
 
     return filters
