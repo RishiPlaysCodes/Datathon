@@ -147,6 +147,11 @@ export function LoginPage() {
         <p className="text-center text-xs text-gray-600 mt-4">
           Predictive Relational AI for Holistic Analytics & Response Intelligence
         </p>
+        <div className="text-center mt-3">
+          <a href="#/public" className="text-xs text-primary-400 hover:text-primary-300 border border-primary-500/30 px-3 py-1.5 rounded-full transition-colors">
+            Public Portal — File complaint without login
+          </a>
+        </div>
       </div>
     </div>
   )
