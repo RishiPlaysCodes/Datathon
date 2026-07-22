@@ -335,7 +335,7 @@ class SmokeTest:
         context: Dict[str, Any] = {}
 
         def fir_list():
-            data = self.expect_json(self.request("GET", "crime/firs", token=token, query={"page": 1, "limit": 100}))
+            data = self.expect_json(self.request("GET", "crime/firs", token=token, query={"page": 1, "limit": 100, "all_stations": "true"}))
             self.require(data.get("total", 0) >= 220, "investigator cannot see the full seeded FIR set")
             self.require(bool(data.get("firs")), "FIR list is empty")
             context["firs"] = data["firs"]
@@ -700,6 +700,7 @@ class SmokeTest:
                     "public/complaint",
                     json_body={
                         "complainant_name": "Test User",
+                        "complainant_phone": "9876500000",
                         "description": "I just want to share some general feedback about the neighbourhood park cleanliness today.",
                     },
                 )
