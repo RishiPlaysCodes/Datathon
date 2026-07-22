@@ -89,13 +89,25 @@ async def chat(
             "Compare districts",
             "Break down by crime type",
         ]
-    else:
-        response_text = await _handle_general_query(message.message, db)
+    elif intent in ("help", "general"):
+        response_text, response_data, sources = await _handle_help_query(db)
         suggestions = [
-            "Show recent FIRs",
+            "Show recent theft cases",
             "List repeat offenders",
-            "Show crime hotspots",
-            "Search by location",
+            "Crime statistics this month",
+            "Crime hotspots in Bangalore",
+        ]
+    elif intent == "greeting":
+        response_text = (
+            "Namaste! Main **PRAHARI** hoon - aapka Crime Intelligence Assistant. "
+            "Aap mujhse English ya Hinglish dono mein baat kar sakte ho. "
+            "Type 'help' ya 'features' to see everything I can do."
+        )
+        suggestions = [
+            "What can you do?",
+            "Show recent FIRs",
+            "Crime statistics this month",
+            "List repeat offenders",
         ]
 
     # Save assistant response
@@ -403,38 +415,38 @@ async def _handle_statistics_query(db: AsyncSession, filters: dict, query: str):
     return response, data, ["Crime Statistics Database"]
 
 
-async def _handle_general_query(query: str, db: AsyncSession):
-    """Handle general/conversational queries."""
-    # Simple keyword-based response for common queries
-    query_lower = query.lower()
+async def _handle_help_query(db: AsyncSession):
+    """Explain capabilities, grounded with live database counts.
 
-    if any(w in query_lower for w in ["help", "what can you do", "capabilities"]):
-        return (
-            "I'm PRAHARI, your Crime Intelligence Assistant. I can help you with:\n\n"
-            "- **Search FIRs**: 'Show chain-snatching cases in Koramangala last 6 months'\n"
-            "- **Accused Info**: 'Tell me about accused Ravi Kumar'\n"
-            "- **Network Analysis**: 'Show criminal network for Suresh'\n"
-            "- **Hotspot Maps**: 'Show crime hotspots in Bangalore'\n"
-            "- **Risk Assessment**: 'What is the risk score for accused #5?'\n"
-            "- **Statistics**: 'Crime statistics for last quarter'\n\n"
-            "Try asking a question in natural language!"
-        )
+    This is the graceful fallback for any query we can't map to a specific
+    intent, so the assistant never dead-ends with 'please rephrase'.
+    """
+    total_firs = (await db.execute(select(func.count(FIR.id)))).scalar() or 0
+    total_accused = (await db.execute(select(func.count(Accused.id)))).scalar() or 0
+    repeat = (
+        await db.execute(select(func.count(Accused.id)).where(Accused.is_repeat_offender == True))
+    ).scalar() or 0
 
-    if any(w in query_lower for w in ["hello", "hi", "hey", "namaste"]):
-        return (
-            "Namaste! I'm PRAHARI - your Predictive Relational AI for Holistic Analytics "
-            "& Response Intelligence. How can I assist your investigation today?"
-        )
-
-    return (
-        "I understand your query but need more context. You can ask me about:\n"
-        "- FIR searches by location, crime type, or time period\n"
-        "- Criminal network analysis\n"
-        "- Risk assessment of accused persons\n"
-        "- Crime hotspot analysis\n"
-        "- Statistics and trends\n\n"
-        "Please rephrase your question with specific details."
+    response = (
+        "I'm **PRAHARI**, your Crime Intelligence Assistant. I can answer questions in "
+        "**English or Hinglish**. Here's what I can do right now over "
+        f"**{total_firs} FIRs**, **{total_accused} accused** ({repeat} repeat offenders):\n\n"
+        "**1. Search FIRs** — _\"Show chain snatching cases in Koramangala last 6 months\"_ / _\"chori ke case dikhao\"_\n"
+        "**2. Accused Info** — _\"Tell me about Ravi Kumar\"_ / _\"aaropi ki jaankari do\"_\n"
+        "**3. Criminal Network** — _\"Show network for Ravi Kumar\"_ / _\"gang dikhao\"_\n"
+        "**4. Crime Hotspots** — _\"Crime hotspots in Bangalore\"_ / _\"khatarnak ilaka batao\"_\n"
+        "**5. Risk Assessment** — _\"Risk score for the top offender\"_ / _\"kitna khatarnak hai\"_\n"
+        "**6. Statistics & Trends** — _\"Crime statistics this month\"_ / _\"kitne case hue\"_\n\n"
+        "Just type (or **speak** using the mic) your question naturally."
     )
+    data = {
+        "capabilities": [
+            "search_firs", "accused_info", "network_analysis",
+            "hotspot_analysis", "risk_assessment", "statistics",
+        ],
+        "totals": {"firs": total_firs, "accused": total_accused, "repeat_offenders": repeat},
+    }
+    return response, data, ["PRAHARI Capability Guide"]
 
 
 @router.get("/chat/history/{session_id}")

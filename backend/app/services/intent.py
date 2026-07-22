@@ -3,39 +3,71 @@ import re
 from typing import Dict, Any
 
 
-# Intent patterns - maps keywords to intents
+# Intent patterns - maps keywords to intents.
+# Includes English + Hinglish/romanized-Hindi keywords so investigators can
+# type the way they naturally speak (e.g. "chori ke case dikhao").
 INTENT_PATTERNS = {
     "search_firs": [
         r"show.*fir", r"find.*case", r"search.*crime", r"list.*fir",
         r"chain.?snatching", r"theft", r"robbery", r"murder", r"assault",
         r"burglary", r"fraud", r"cyber", r"domestic",
         r"cases?\s+(in|near|around|at)", r"fir.*(in|near|from)",
-        r"crime.*(in|near|at)", r"show.*cases?",
+        r"crime.*(in|near|at)", r"show.*cases?", r"\bfirs?\b", r"\bcases?\b",
+        # Hinglish
+        r"dikhao", r"dikha\s?do", r"batao.*case", r"case.*batao",
+        r"chori", r"loot", r"hatya", r"katal", r"jurm", r"apradh", r"mamla",
     ],
     "accused_info": [
         r"accused", r"offender", r"criminal", r"suspect",
         r"who\s+is", r"tell\s+me\s+about", r"profile\s+of",
         r"information\s+(on|about)", r"details\s+(of|about)",
+        # Hinglish
+        r"aaropi", r"mulzim", r"apradhi", r"kaun\s+hai",
+        r"ke\s+baare\s+me", r"ki\s+jaankari", r"badmaash", r"gunehgar",
     ],
     "network_analysis": [
         r"network", r"connect", r"associate", r"gang",
         r"linked\s+to", r"related\s+to", r"connection",
         r"co.?accused", r"accomplice", r"graph",
+        # Hinglish
+        r"giroh", r"saathi", r"juda", r"jude\s+hue", r"rishta",
+        r"sambandh", r"connection.*dikha",
     ],
     "hotspot_analysis": [
         r"hotspot", r"heatmap", r"heat\s+map", r"map",
         r"where.*crime", r"crime.*area", r"dangerous",
         r"unsafe", r"location.*crime",
+        # Hinglish
+        r"kahan.*crime", r"kahan.*jurm", r"khatarnak\s+ilaka",
+        r"unsafe\s+area", r"kaunsi\s+jagah", r"ilaka", r"map.*dikha",
     ],
     "risk_assessment": [
         r"risk", r"danger", r"threat", r"score",
         r"how\s+dangerous", r"likelihood", r"probability",
         r"recidiv", r"repeat.*offend",
+        # Hinglish
+        r"khatra", r"kitna\s+khatarnak", r"jokhim", r"khatarnaak",
+        r"risk\s+score", r"kitna\s+risk",
     ],
     "statistics": [
         r"statistic", r"trend", r"count", r"total",
         r"how\s+many", r"number\s+of", r"summary",
         r"overview", r"dashboard", r"compare",
+        # Hinglish
+        r"kitne", r"kitna", r"aankde", r"ginti", r"total\s+kitne",
+        r"summary\s+do", r"trend.*dikha", r"tulna",
+    ],
+    "help": [
+        r"help", r"what\s+can\s+you\s+do", r"capabilit", r"features?",
+        r"how\s+(do|to)\s+use", r"what\s+do\s+you\s+do", r"guide",
+        r"options?", r"commands?",
+        # Hinglish
+        r"kya\s+kar\s+sakte", r"kaise\s+use", r"kaun\s?kaun\s?se",
+        r"kaunse\s+features?", r"kya\s+features?", r"madad", r"kaise\s+kaam",
+    ],
+    "greeting": [
+        r"^\s*(hi|hello|hey|hii+|yo)\b", r"namaste", r"namaskar",
+        r"good\s+(morning|afternoon|evening)", r"kaise\s+ho", r"kya\s+haal",
     ],
 }
 
@@ -52,19 +84,19 @@ LOCATIONS = [
 
 # Crime type patterns
 CRIME_TYPES = {
-    "chain snatching": ["chain.?snatch", "gold.?snatch", "necklace.?theft"],
-    "theft": ["theft", "steal", "stole", "stolen", "larceny"],
-    "robbery": ["robbery", "robbed", "dacoity", "loot"],
-    "murder": ["murder", "homicide", "kill", "dead body"],
-    "assault": ["assault", "attack", "beat", "hurt", "grievous"],
-    "burglary": ["burglary", "break.?in", "house.?break"],
-    "fraud": ["fraud", "cheat", "scam", "swindle", "forgery"],
+    "chain snatching": ["chain.?snatch", "gold.?snatch", "necklace.?theft", "chain.?cheen"],
+    "theft": ["theft", "steal", "stole", "stolen", "larceny", "chori"],
+    "robbery": ["robbery", "robbed", "dacoity", "loot", "lut"],
+    "murder": ["murder", "homicide", "kill", "dead body", "hatya", "katal", "khoon"],
+    "assault": ["assault", "attack", "beat", "hurt", "grievous", "maar.?peet", "hamla"],
+    "burglary": ["burglary", "break.?in", "house.?break", "sendh"],
+    "fraud": ["fraud", "cheat", "scam", "swindle", "forgery", "dhokha", "thagi"],
     "cyber crime": ["cyber", "online.?fraud", "hacking", "phishing"],
-    "domestic violence": ["domestic", "dowry", "wife.?beat", "cruelty"],
-    "vehicle theft": ["vehicle.?theft", "bike.?theft", "car.?theft", "auto.?theft"],
-    "drug offense": ["drug", "narcotic", "ndps", "ganja", "cocaine"],
-    "sexual offense": ["rape", "molest", "sexual", "eve.?teas"],
-    "kidnapping": ["kidnap", "abduct", "missing.?person"],
+    "domestic violence": ["domestic", "dowry", "wife.?beat", "cruelty", "dahej", "ghareloo"],
+    "vehicle theft": ["vehicle.?theft", "bike.?theft", "car.?theft", "auto.?theft", "gaadi.?chori"],
+    "drug offense": ["drug", "narcotic", "ndps", "ganja", "cocaine", "nasha"],
+    "sexual offense": ["rape", "molest", "sexual", "eve.?teas", "chhed"],
+    "kidnapping": ["kidnap", "abduct", "missing.?person", "apahran"],
 }
 
 
@@ -72,6 +104,8 @@ CRIME_TYPES = {
 # "Show criminal network for Ravi Kumar" contains both "criminal" and
 # "network", but the network request is the user's actual intent.
 INTENT_PRIORITY = [
+    "greeting",
+    "help",
     "network_analysis",
     "risk_assessment",
     "hotspot_analysis",
@@ -96,7 +130,15 @@ def classify_intent(query: str) -> Dict[str, Any]:
         if highest_score > 0
         else "general"
     )
-    confidence = min(scores.get(best_intent, 0) / 3.0, 1.0) if best_intent != "general" else 0.3
+
+    # More realistic confidence: a single strong keyword match already gives a
+    # meaningful signal, and additional matches raise it toward certainty.
+    if best_intent == "general":
+        confidence = 0.3
+    elif best_intent in ("greeting", "help"):
+        confidence = 0.95
+    else:
+        confidence = min(0.55 + 0.15 * scores.get(best_intent, 0), 0.97)
 
     # Preserve original casing so proper names can be extracted reliably.
     filters = extract_filters(original_query)

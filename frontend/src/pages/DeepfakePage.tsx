@@ -179,7 +179,7 @@ export function DeepfakePage() {
             {loading ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
-                Analyzing with CNN ensemble...
+                Running media forensics...
               </>
             ) : (
               <>
@@ -189,27 +189,33 @@ export function DeepfakePage() {
             )}
           </button>
 
-          {/* Model Info */}
+          {/* Forensic checks (real, byte-level) */}
           <div className="glass-card p-4">
-            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Detection Models</h3>
+            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+              Forensic Checks (byte-level)
+            </h3>
             <div className="space-y-2 text-xs text-gray-500">
               <div className="flex items-center justify-between">
-                <span>EfficientNet-B7</span>
+                <span>AI-generation metadata scan</span>
                 <span className="text-green-400">Active</span>
               </div>
               <div className="flex items-center justify-between">
-                <span>XceptionNet</span>
+                <span>Editor signature detection</span>
                 <span className="text-green-400">Active</span>
               </div>
               <div className="flex items-center justify-between">
-                <span>Frequency Domain Analysis</span>
+                <span>Camera EXIF / provenance (C2PA)</span>
                 <span className="text-green-400">Active</span>
               </div>
               <div className="flex items-center justify-between">
-                <span>GAN Fingerprint Scanner</span>
+                <span>Structure & byte-entropy analysis</span>
                 <span className="text-green-400">Active</span>
               </div>
             </div>
+            <p className="text-[10px] text-gray-600 mt-3 leading-relaxed">
+              Advisory metadata/structural forensics — analyzes the actual file bytes.
+              For court use, certified lab verification is required.
+            </p>
           </div>
         </div>
 
@@ -272,13 +278,13 @@ export function DeepfakePage() {
                 </h4>
                 <div className="grid grid-cols-2 gap-3">
                   {Object.entries(result.analysis_details)
-                    .filter(([key]) => key !== 'model_used' && key !== 'processing_time_ms')
+                    .filter(([key]) => key !== 'analysis_method')
                     .map(([key, value]) => (
                       <div key={key} className="bg-dark-800/50 rounded-lg p-2.5">
                         <p className="text-[10px] text-gray-500 uppercase tracking-wider">
                           {key.replace(/_/g, ' ')}
                         </p>
-                        <p className="text-sm text-gray-200 font-medium mt-0.5">
+                        <p className="text-sm text-gray-200 font-medium mt-0.5 break-words">
                           {typeof value === 'number' ? value.toFixed(3) :
                            typeof value === 'boolean' ? (value ? 'Yes' : 'No') :
                            String(value)}
@@ -286,10 +292,11 @@ export function DeepfakePage() {
                       </div>
                     ))}
                 </div>
-                <div className="mt-3 pt-3 border-t border-dark-700/30 flex items-center justify-between text-xs text-gray-500">
-                  <span>Model: {result.analysis_details.model_used}</span>
-                  <span>{result.analysis_details.processing_time_ms}ms</span>
-                </div>
+                {result.analysis_details.analysis_method && (
+                  <div className="mt-3 pt-3 border-t border-dark-700/30 text-xs text-gray-500">
+                    Method: {String(result.analysis_details.analysis_method)}
+                  </div>
+                )}
               </div>
 
               {/* Recommendations */}
@@ -312,7 +319,8 @@ export function DeepfakePage() {
               <ScanSearch className="w-16 h-16 text-gray-700 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-gray-400">Upload Media to Analyze</h3>
               <p className="text-sm text-gray-600 mt-1">
-                Our AI ensemble will scan for deepfake markers, GAN fingerprints, and manipulation artifacts
+                We scan the file's actual bytes for AI-generation metadata, editor signatures,
+                provenance manifests, camera EXIF, and structural anomalies
               </p>
             </div>
           )}
