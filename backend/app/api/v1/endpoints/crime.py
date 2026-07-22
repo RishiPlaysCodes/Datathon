@@ -167,8 +167,11 @@ async def get_accused_profile(
         fir_result = await db.execute(select(FIR).where(FIR.id.in_(fir_ids)))
         firs = [FIRResponse.model_validate(f) for f in fir_result.scalars().all()]
 
-    # Calculate risk score
+    # Calculate risk score breakdown (for explanation) but use stored score for headline
     risk_breakdown = calculate_risk_score(accused, firs)
+    # The headline risk_score in the accused record is the stored value (same as
+    # seen in the accused list). The breakdown shows how it was computed.
+    risk_breakdown["overall_score"] = accused.risk_score
 
     # Get network connections
     net_result = await db.execute(

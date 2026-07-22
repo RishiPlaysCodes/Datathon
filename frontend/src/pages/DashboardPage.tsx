@@ -37,7 +37,7 @@ export function DashboardPage() {
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-white">Command Center</h1>
-        <p className="text-gray-400 text-sm mt-1">Real-time crime intelligence overview</p>
+        <p className="text-gray-400 text-sm mt-1">Crime intelligence overview · Last 180 days</p>
       </div>
 
       {/* Stats Cards */}
@@ -122,12 +122,12 @@ export function DashboardPage() {
       <div className="glass-card p-6">
         <h3 className="text-sm font-semibold text-gray-300 mb-4 flex items-center gap-2">
           <MapPin className="w-4 h-4 text-primary-400" />
-          Crime by District
+          Crime by Location
         </h3>
         <ResponsiveContainer width="100%" height={200}>
-          <BarChart data={dashboard.district_stats.slice(0, 8)}>
+          <BarChart data={dashboard.hotspots.slice(0, 8).map(h => ({ location: h.location_name || 'Unknown', count: h.count }))}>
             <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-            <XAxis dataKey="district" stroke="#64748b" fontSize={11} angle={-20} textAnchor="end" height={60} />
+            <XAxis dataKey="location" stroke="#64748b" fontSize={10} angle={-20} textAnchor="end" height={60} />
             <YAxis stroke="#64748b" fontSize={11} />
             <Tooltip
               contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}

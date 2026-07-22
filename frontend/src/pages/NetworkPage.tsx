@@ -200,36 +200,75 @@ export function NetworkPage() {
 }
 
 function NetworkVisualization({ graph }: { graph: NetworkGraph }) {
-  // SVG-based network visualization
   const width = 700
   const height = 500
-  const centerX = width / 2
-  const centerY = height / 2
 
-  // Position nodes in a force-directed-like layout
-  const nodePositions: Record<string, { x: number; y: number }> = {}
-  const nodesByType: Record<string, typeof graph.nodes> = {}
-
-  graph.nodes.forEach(node => {
-    if (!nodesByType[node.type]) nodesByType[node.type] = []
-    nodesByType[node.type].push(node)
-  })
-
-  // Layout nodes in concentric circles by type
-  const typeOrder = ['accused', 'fir', 'location']
-  let radius = 0
-
-  typeOrder.forEach((type, typeIdx) => {
-    const nodes = nodesByType[type] || []
-    radius = 80 + typeIdx * 120
-    nodes.forEach((node, idx) => {
-      const angle = (2 * Math.PI * idx) / Math.max(nodes.length, 1)
-      nodePositions[node.id] = {
-        x: centerX + radius * Math.cos(angle) + (Math.random() - 0.5) * 20,
-        y: centerY + radius * Math.sin(angle) + (Math.random() - 0.5) * 20,
-      }
+  // Deterministic force-directed layout: iteratively push connected nodes
+  // apart while pulling edges together, seeded from type-based circles.
+  const [positions, setPositions] = useState<Record<string, { x: number; y: number }>>(() => {
+    const pos: Record<string, { x: number; y: number }> = {}
+    const byType: Record<string, typeof graph.nodes> = {}
+    graph.nodes.forEach(n => {
+      if (!byType[n.type]) byType[n.type] = []
+      byType[n.type].push(n)
     })
+    const typeOrder = ['accused', 'fir', 'location']
+    typeOrder.forEach((type, ti) => {
+      const nodes = byType[type] || []
+      const r = 80 + ti * 130
+      nodes.forEach((n, i) => {
+        const angle = (2 * Math.PI * i) / Math.max(nodes.length, 1) + ti * 0.3
+        pos[n.id] = { x: width / 2 + r * Math.cos(angle), y: height / 2 + r * Math.sin(angle) }
+      })
+    })
+    // Simple force iterations to reduce overlap
+    for (let iter = 0; iter < 50; iter++) {
+      // Repulsion between all nodes
+      const ids = Object.keys(pos)
+      for (let i = 0; i < ids.length; i++) {
+        for (let j = i + 1; j < ids.length; j++) {
+          const a = pos[ids[i]], b = pos[ids[j]]
+          const dx = b.x - a.x, dy = b.y - a.y
+          const dist = Math.sqrt(dx * dx + dy * dy) || 1
+          if (dist < 60) {
+            const force = (60 - dist) * 0.3 / dist
+            a.x -= dx * force; a.y -= dy * force
+            b.x += dx * force; b.y += dy * force
+          }
+        }
+      }
+      // Attraction along edges
+      graph.edges.forEach(e => {
+        const a = pos[e.source], b = pos[e.target]
+        if (a && b) {
+          const dx = b.x - a.x, dy = b.y - a.y
+          const dist = Math.sqrt(dx * dx + dy * dy) || 1
+          if (dist > 150) {
+            const force = (dist - 150) * 0.01 / dist
+            a.x += dx * force; a.y += dy * force
+            b.x -= dx * force; b.y -= dy * force
+          }
+        }
+      })
+    }
+    // Clamp to bounds
+    Object.values(pos).forEach(p => {
+      p.x = Math.max(30, Math.min(width - 30, p.x))
+      p.y = Math.max(30, Math.min(height - 30, p.y))
+    })
+    return pos
   })
+  const [dragging, setDragging] = useState<string | null>(null)
+
+  const handleMouseDown = (nodeId: string) => setDragging(nodeId)
+  const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
+    if (!dragging) return
+    const svg = e.currentTarget.getBoundingClientRect()
+    const x = ((e.clientX - svg.left) / svg.width) * width
+    const y = ((e.clientY - svg.top) / svg.height) * height
+    setPositions(prev => ({ ...prev, [dragging]: { x, y } }))
+  }
+  const handleMouseUp = () => setDragging(null)
 
   const getNodeColor = (type: string) => {
     switch (type) {
@@ -241,52 +280,36 @@ function NetworkVisualization({ graph }: { graph: NetworkGraph }) {
   }
 
   return (
-    <svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`} className="bg-dark-900/50 rounded-lg">
+    <svg
+      width="100%" height={height} viewBox={`0 0 ${width} ${height}`}
+      className="bg-dark-900/50 rounded-lg cursor-grab active:cursor-grabbing select-none"
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUp}
+      onMouseLeave={handleMouseUp}
+    >
       {/* Edges */}
       {graph.edges.map((edge, idx) => {
-        const from = nodePositions[edge.source]
-        const to = nodePositions[edge.target]
+        const from = positions[edge.source]
+        const to = positions[edge.target]
         if (!from || !to) return null
         return (
-          <line
-            key={idx}
-            x1={from.x}
-            y1={from.y}
-            x2={to.x}
-            y2={to.y}
-            stroke="#334155"
-            strokeWidth={edge.weight * 2}
-            opacity={0.6}
+          <line key={idx} x1={from.x} y1={from.y} x2={to.x} y2={to.y}
+            stroke="#475569" strokeWidth={Math.max(1, edge.weight * 2)} opacity={0.5}
           />
         )
       })}
-
       {/* Nodes */}
       {graph.nodes.map((node) => {
-        const pos = nodePositions[node.id]
+        const pos = positions[node.id]
         if (!pos) return null
         const color = getNodeColor(node.type)
-        const size = node.type === 'accused' ? 12 : 8
-
+        const size = node.type === 'accused' ? 14 : 9
         return (
-          <g key={node.id}>
-            <circle
-              cx={pos.x}
-              cy={pos.y}
-              r={size}
-              fill={color}
-              opacity={0.8}
-              stroke={color}
-              strokeWidth={2}
-              strokeOpacity={0.3}
-            />
-            <text
-              x={pos.x}
-              y={pos.y + size + 12}
-              textAnchor="middle"
-              className="text-[9px] fill-gray-400"
-            >
-              {node.label.length > 15 ? node.label.slice(0, 15) + '...' : node.label}
+          <g key={node.id} onMouseDown={() => handleMouseDown(node.id)} style={{ cursor: 'grab' }}>
+            <circle cx={pos.x} cy={pos.y} r={size + 4} fill="transparent" />
+            <circle cx={pos.x} cy={pos.y} r={size} fill={color} opacity={0.85} stroke={color} strokeWidth={3} strokeOpacity={0.2} />
+            <text x={pos.x} y={pos.y + size + 13} textAnchor="middle" className="text-[9px] fill-gray-400 pointer-events-none select-none">
+              {node.label.length > 14 ? node.label.slice(0, 14) + '…' : node.label}
             </text>
           </g>
         )
