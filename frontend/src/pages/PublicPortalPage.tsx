@@ -89,12 +89,20 @@ function ComplaintForm() {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <InfoCard label="Complaint Number" value={result.complaint_number} />
+          <InfoCard label="Tracking Number" value={result.tracking_number} />
           <InfoCard label="Status" value={result.status} />
+          <InfoCard label="Assigned Police Station" value={result.assigned_station} />
           <InfoCard label="AI Crime Type" value={result.ai_crime_type} />
           <InfoCard label="AI Confidence" value={`${(result.ai_confidence * 100).toFixed(0)}%`} />
           <InfoCard label="Severity" value={result.ai_severity} />
           <InfoCard label="Law Violated" value={result.law_violated ? 'Yes' : 'Not detected'} />
         </div>
+        {result.helpline && (
+          <div className="bg-dark-800/50 rounded-lg p-3 border border-primary-500/20">
+            <p className="text-xs text-gray-500 uppercase mb-1">Helpline Numbers</p>
+            <p className="text-sm text-primary-300">{result.helpline}</p>
+          </div>
+        )}
         {result.ai_law_sections?.length > 0 && (
           <div className="bg-dark-800/50 rounded-lg p-3">
             <p className="text-xs text-gray-500 uppercase mb-1">Applicable Law Sections</p>

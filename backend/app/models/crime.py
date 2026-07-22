@@ -27,6 +27,8 @@ class FIR(Base):
     severity = Column(String(20), default="medium")  # low, medium, high, critical
     investigating_officer = Column(String(255), nullable=True)
     complainant_name = Column(String(255), nullable=True)
+    complainant_phone = Column(String(20), nullable=True)
+    complainant_email = Column(String(255), nullable=True)
     complainant_user_id = Column(Integer, nullable=True, index=True)  # links FIR to citizen user
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
