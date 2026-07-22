@@ -135,11 +135,19 @@ function ComplaintForm() {
             <span className="text-xs px-2 py-0.5 rounded-full bg-primary-500/20 text-primary-300">{(result.ai_confidence*100).toFixed(0)}% confidence</span>
           </div>
           {result.user_crime_type && result.user_crime_type !== result.ai_crime_type && (
-            <p className="text-xs text-yellow-400">Your selection: {result.user_crime_type} (overrides AI)</p>
+            <p className="text-xs text-yellow-400 mt-1">✅ Your manual selection: <b>{result.user_crime_type}</b> (overrides AI — this is what goes on record)</p>
+          )}
+          {!result.user_crime_type && (
+            <p className="text-[10px] text-gray-500 mt-1">ℹ️ You didn't select a crime type manually — AI's suggestion will be used. To override, go back and select from the dropdown.</p>
           )}
           {result.ai_law_sections?.length > 0 && (
-            <div><p className="text-xs text-gray-500">Applicable Sections:</p>
-              {result.ai_law_sections.map((s: string, i: number) => <span key={i} className="text-xs px-2 py-0.5 rounded bg-blue-500/10 text-blue-300 mr-1">{s}</span>)}
+            <div className="mt-2">
+              <p className="text-xs text-gray-500 mb-1.5">Applicable Law Sections (AI Detected):</p>
+              <div className="space-y-1">
+                {result.ai_law_sections.map((s: string, i: number) => (
+                  <p key={i} className="text-xs text-blue-300 bg-blue-500/10 rounded px-2.5 py-1.5 leading-relaxed">{s}</p>
+                ))}
+              </div>
             </div>
           )}
           {!result.law_violated && (

@@ -38,9 +38,9 @@ INDIAN_LAWS = {
         "it_act": "Section 66D IT Act (Cheating by personation using computer resource)",
     },
     "cyber crime": {
-        "ipc": "420/468/471 IPC",
-        "bns": "318/336/338 BNS",
-        "it_act": "Section 43/66/66C/66D IT Act",
+        "ipc": "420/463/468 IPC (Cheating / Forgery)",
+        "bns": "318/319 BNS (Cheating / Cheating by personation)",
+        "it_act": "IT Act 2000 — Section 43 (Damage to computer), Section 66 (Computer related offences), Section 66C (Identity theft), Section 66D (Cheating by personation using computer resource)",
     },
     "theft": {
         "ipc": "379/380 IPC (Theft / Theft in dwelling house)",
