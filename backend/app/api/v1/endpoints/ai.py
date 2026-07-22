@@ -9,12 +9,36 @@ from datetime import datetime, timedelta
 
 from app.db.session import get_db
 from app.models.user import User, ConversationHistory
-from app.models.crime import FIR, Accused, FIRAccusedLink
+from app.models.crime import FIR, Accused, Victim, FIRAccusedLink
 from app.schemas.crime import ChatMessage, ChatResponse, FIRResponse
 from app.api.deps import require_role
-from app.services.intent import classify_intent, extract_filters
+from app.services.intent import classify_intent, extract_filters, is_refinement
 from app.services.risk import calculate_risk_score
 from app.services.audit import record_audit_event
+
+DEFAULT_DAYS = 180
+
+
+async def _load_previous_context(db: AsyncSession, session_id: str, user_id: int):
+    """Fetch the last assistant turn's intent + filters for multi-turn context."""
+    result = await db.execute(
+        select(ConversationHistory)
+        .where(
+            ConversationHistory.session_id == session_id,
+            ConversationHistory.user_id == user_id,
+            ConversationHistory.role == "assistant",
+        )
+        .order_by(ConversationHistory.id.desc())
+        .limit(1)
+    )
+    last = result.scalar_one_or_none()
+    if not last or not last.metadata_json:
+        return None, {}
+    try:
+        meta = json.loads(last.metadata_json)
+        return meta.get("intent"), meta.get("filters") or {}
+    except (ValueError, TypeError):
+        return None, {}
 
 router = APIRouter(prefix="/ai", tags=["AI Chat"])
 
@@ -41,6 +65,18 @@ async def chat(
     intent_result = classify_intent(message.message)
     intent = intent_result["intent"]
     filters = intent_result["filters"]
+    confidence = intent_result.get("confidence", 0.8)
+
+    # Multi-turn context: if this message is a refinement of the previous turn
+    # (e.g. "ab sirf female", "only open cases"), carry forward the previous
+    # intent and merge its filters so follow-up questions work.
+    prev_intent, prev_filters = await _load_previous_context(db, session_id, current_user.id)
+    if prev_intent and is_refinement(message.message):
+        if intent in ("general", "help", "greeting"):
+            intent = prev_intent
+            confidence = max(confidence, 0.75)
+        # New (explicit) filters override carried-forward ones.
+        filters = {**prev_filters, **filters}
 
     # Route to appropriate handler
     response_data = None
@@ -99,9 +135,9 @@ async def chat(
         ]
     elif intent == "greeting":
         response_text = (
-            "Namaste! Main **PRAHARI** hoon - aapka Crime Intelligence Assistant. "
-            "Aap mujhse English ya Hinglish dono mein baat kar sakte ho. "
-            "Type 'help' ya 'features' to see everything I can do."
+            "Namaste! / ನಮಸ್ಕಾರ! Main **PRAHARI** hoon - aapka Crime Intelligence Assistant. "
+            "Aap mujhse **English, Hinglish ya Kannada** mein baat kar sakte ho. "
+            "Type 'help' / 'features' / 'ಸಹಾಯ' to see everything I can do."
         )
         suggestions = [
             "What can you do?",
@@ -132,7 +168,7 @@ async def chat(
         response=response_text,
         session_id=session_id,
         intent=intent,
-        confidence=intent_result.get("confidence", 0.8),
+        confidence=confidence,
         data=response_data,
         sources=sources,
         suggestions=suggestions,
@@ -142,7 +178,7 @@ async def chat(
 async def _handle_fir_search(db: AsyncSession, filters: dict, query: str):
     """Handle FIR search queries."""
     conditions = []
-    date_from = datetime.now() - timedelta(days=filters.get("days", 180))
+    date_from = datetime.now() - timedelta(days=filters.get("days", DEFAULT_DAYS))
     conditions.append(FIR.date_of_occurrence >= date_from)
 
     if filters.get("crime_type"):
@@ -154,6 +190,11 @@ async def _handle_fir_search(db: AsyncSession, filters: dict, query: str):
         )
     if filters.get("status"):
         conditions.append(FIR.status == filters["status"])
+    # Victim gender filter (e.g. "show only female victims") - restricts FIRs
+    # to those linked to a victim of the requested gender.
+    if filters.get("gender"):
+        victim_fir_ids = select(Victim.fir_id).where(Victim.gender == filters["gender"])
+        conditions.append(FIR.id.in_(victim_fir_ids))
 
     result = await db.execute(
         select(FIR).where(and_(*conditions)).order_by(FIR.date_of_occurrence.desc()).limit(20)
@@ -275,7 +316,7 @@ async def _handle_network_query(db: AsyncSession, filters: dict, query: str):
 
 async def _handle_hotspot_query(db: AsyncSession, filters: dict, query: str):
     """Handle hotspot analysis queries."""
-    days = filters.get("days", 90)
+    days = filters.get("days", DEFAULT_DAYS)
     date_from = datetime.now() - timedelta(days=days)
     conditions = [FIR.date_of_occurrence >= date_from, FIR.latitude.isnot(None)]
 
@@ -361,7 +402,7 @@ async def _handle_risk_query(db: AsyncSession, filters: dict, query: str):
 
 async def _handle_statistics_query(db: AsyncSession, filters: dict, query: str):
     """Handle statistics queries."""
-    days = filters.get("days", 90)
+    days = filters.get("days", DEFAULT_DAYS)
     date_from = datetime.now() - timedelta(days=days)
     conditions = [FIR.date_of_occurrence >= date_from]
     if filters.get("crime_type"):
@@ -428,15 +469,16 @@ async def _handle_help_query(db: AsyncSession):
     ).scalar() or 0
 
     response = (
-        "I'm **PRAHARI**, your Crime Intelligence Assistant. I can answer questions in "
-        "**English or Hinglish**. Here's what I can do right now over "
+        "I'm **PRAHARI**, your Crime Intelligence Assistant. I understand "
+        "**English, Hinglish and Kannada**. Here's what I can do right now over "
         f"**{total_firs} FIRs**, **{total_accused} accused** ({repeat} repeat offenders):\n\n"
-        "**1. Search FIRs** — _\"Show chain snatching cases in Koramangala last 6 months\"_ / _\"chori ke case dikhao\"_\n"
-        "**2. Accused Info** — _\"Tell me about Ravi Kumar\"_ / _\"aaropi ki jaankari do\"_\n"
-        "**3. Criminal Network** — _\"Show network for Ravi Kumar\"_ / _\"gang dikhao\"_\n"
-        "**4. Crime Hotspots** — _\"Crime hotspots in Bangalore\"_ / _\"khatarnak ilaka batao\"_\n"
-        "**5. Risk Assessment** — _\"Risk score for the top offender\"_ / _\"kitna khatarnak hai\"_\n"
-        "**6. Statistics & Trends** — _\"Crime statistics this month\"_ / _\"kitne case hue\"_\n\n"
+        "**1. Search FIRs** — _\"Show chain snatching in Koramangala\"_ / _\"chori ke case dikhao\"_ / _\"ಕಳ್ಳತನ ಪ್ರಕರಣ ತೋರಿಸು\"_\n"
+        "**2. Accused Info** — _\"Tell me about Ravi Kumar\"_ / _\"aaropi ki jaankari do\"_ / _\"ಆರೋಪಿ ಯಾರು\"_\n"
+        "**3. Criminal Network** — _\"Show network for Ravi Kumar\"_ / _\"gang dikhao\"_ / _\"ಗುಂಪು ತೋರಿಸು\"_\n"
+        "**4. Crime Hotspots** — _\"Crime hotspots in Bangalore\"_ / _\"khatarnak ilaka batao\"_ / _\"ಅಪಾಯಕಾರಿ ಪ್ರದೇಶ\"_\n"
+        "**5. Risk Assessment** — _\"Risk score for the top offender\"_ / _\"kitna khatarnak hai\"_ / _\"ಅಪಾಯ ಎಷ್ಟು\"_\n"
+        "**6. Statistics & Trends** — _\"Crime statistics this month\"_ / _\"kitne case hue\"_ / _\"ಎಷ್ಟು ಪ್ರಕರಣ\"_\n\n"
+        "Follow-ups work too — after a search, say _\"only female victims\"_ or _\"sirf open cases\"_.\n"
         "Just type (or **speak** using the mic) your question naturally."
     )
     data = {

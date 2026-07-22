@@ -15,6 +15,7 @@ from app.core.security import (
     decode_token,
 )
 from app.api.deps import get_current_user
+from app.services.audit import record_audit_event
 
 logger = logging.getLogger("prahari")
 router = APIRouter(prefix="/auth", tags=["Authentication"])
@@ -53,6 +54,14 @@ async def register(user_data: UserCreate, db: AsyncSession = Depends(get_db)):
 
     access_token = create_access_token(data={"sub": user.username, "role": user.role})
     refresh_token = create_refresh_token(data={"sub": user.username})
+
+    await record_audit_event(
+        db,
+        user,
+        "USER_REGISTERED",
+        details=f"New citizen account created: {user.username}",
+        risk_level="low",
+    )
 
     return TokenResponse(
         access_token=access_token,
@@ -94,6 +103,15 @@ async def login(credentials: UserLogin, db: AsyncSession = Depends(get_db)):
     refresh_token = create_refresh_token(data={"sub": user.username})
 
     logger.info(f"Login SUCCESS: {user.full_name} ({user.role})")
+
+    # Tamper-evident audit trail entry for the authentication event.
+    await record_audit_event(
+        db,
+        user,
+        "LOGIN",
+        details=f"{user.full_name} ({user.role}) logged in",
+        risk_level="low",
+    )
 
     return TokenResponse(
         access_token=access_token,

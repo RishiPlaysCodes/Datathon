@@ -827,3 +827,61 @@ no longer matches → CHAIN BROKEN → TAMPERING DETECTED!
 
 GitHub: https://github.com/RishiPlaysCodes/Datathon/tree/prahari-rebuild
 PR: https://github.com/RishiPlaysCodes/Datathon/pull/2
+
+
+
+---
+
+# 13. FEATURE STATUS & ENHANCEMENTS (post-stabilization)
+
+This section reflects the audited, current state of the deployed system.
+
+## Newly added / fixed features
+
+| # | Feature | Status | Notes |
+|---|---------|--------|-------|
+| 26 | Multilingual AI Chat | ADDED | Understands **English + Hinglish + Kannada** (romanized and native ಕನ್ನಡ script). e.g. `chori ke case dikhao`, `ಕಳ್ಳತನ ಪ್ರಕರಣ ತೋರಿಸು` |
+| 27 | Voice Assistant | ADDED | Mic speech-to-text input + optional text-to-speech replies in AI Chat (browser Web Speech API; Chrome/Edge). Graceful fallback to typing. |
+| 28 | Multi-turn Context | FIXED | Follow-up refinements now carry prior filters, e.g. after a search say `only female victims` / `sirf open cases` / `ಮಾತ್ರ ಹೆಣ್ಣು`. |
+| 29 | Victim Gender Filter | FIXED | `female/male victims` (English/Hinglish/Kannada) now actually filters FIRs via linked victims (was previously extracted but unused). |
+| 30 | Help / Capability Intent | ADDED | `help` / `features` / `ಸಹಾಯ` returns a grounded capability guide with live counts instead of a dead-end. |
+| 31 | Greeting Intent | ADDED | `hi` / `namaste` / `ನಮಸ್ಕಾರ` handled conversationally. |
+| 32 | Real Deepfake Forensics | REPLACED MOCK | Byte-level analysis of the actual file: AI-generation metadata (Stable Diffusion/Midjourney/DALL-E/C2PA), editor signatures (Photoshop/GIMP/FaceApp), camera EXIF, generative canvas sizes, byte entropy. Explainable and deterministic. Advisory (not a certified lab). |
+| 33 | Login / Registration Audit | ADDED | `LOGIN` and `USER_REGISTERED` events now append to the tamper-evident hash-chained audit trail. |
+| 34 | Confidence Calibration | IMPROVED | Intent confidence is now realistic (single strong keyword ~70%, help/greeting 95%) instead of a flat low value. |
+
+## Language examples the AI understands
+
+| Intent | English | Hinglish | Kannada |
+|--------|---------|----------|---------|
+| Search FIRs | show theft cases in Koramangala | chori ke case dikhao | ಕಳ್ಳತನ ಪ್ರಕರಣ ತೋರಿಸು |
+| Accused Info | tell me about Ravi Kumar | aaropi ki jaankari do | ಆರೋಪಿ ಯಾರು |
+| Network | show network for Ravi Kumar | gang dikhao | ಗುಂಪು ತೋರಿಸು |
+| Hotspots | crime hotspots in Bangalore | khatarnak ilaka batao | ಅಪಾಯಕಾರಿ ಪ್ರದೇಶ |
+| Risk | risk score for top offender | kitna khatarnak hai | ಅಪಾಯ ಎಷ್ಟು |
+| Statistics | crime statistics this month | kitne case hue | ಎಷ್ಟು ಪ್ರಕರಣ |
+
+## Automated verification
+
+`backend/smoke_test.py` covers every major feature end-to-end (auth + RBAC, FIR
+visibility and citizen ownership, accused/OSINT, network, entity resolution,
+analytics, hotspots, AI intent incl. Hinglish/Kannada/help/multi-turn/gender,
+real deepfake detection + determinism, and the hash-chained audit trail incl.
+LOGIN events). Run:
+
+```
+python backend/smoke_test.py --base-url <backend-url> --frontend-url <frontend-index-url>
+```
+
+A promotion is only safe when it reports `0 failed`.
+
+## Honest limitations
+
+- The AI chat is a deterministic keyword/RAG engine over the seeded database, not
+  a general LLM; it answers the 6 crime-intelligence intents (plus help/greeting).
+- Voice input quality depends on the browser; Kannada speech recognition support
+  varies by device. Typing always works.
+- Deepfake detection is metadata/structural forensics (advisory). It reliably
+  flags media carrying AI-generation or editing markers, but cannot guarantee
+  detection of a manipulated file stripped of all metadata; certified lab
+  verification is required for evidentiary use.

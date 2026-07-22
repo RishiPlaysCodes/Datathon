@@ -30,7 +30,7 @@ export function ChatPage() {
     {
       role: 'assistant',
       content:
-        "Namaste! I'm **PRAHARI** - your Crime Intelligence Assistant. Ask me in **English or Hinglish**, or tap the mic and speak. Try:\n\n- \"Show chain-snatching cases in Koramangala last 6 months\"\n- \"chori ke case dikhao\"\n- \"Show criminal network for Ravi Kumar\"\n- \"Crime hotspots in Bangalore\"\n\nType **help** to see everything I can do.",
+        "Namaste! / \u0CA8\u0CAE\u0CB8\u0CCD\u0C95\u0CBE\u0CB0! I'm **PRAHARI** - your Crime Intelligence Assistant. Ask me in **English, Hinglish or Kannada**, or tap the mic and speak. Try:\n\n- \"Show chain-snatching cases in Koramangala\"\n- \"chori ke case dikhao\"\n- \"\u0C95\u0CB3\u0CCD\u0CB3\u0CA4\u0CA8 \u0CAA\u0CCD\u0CB0\u0C95\u0CB0\u0CA3 \u0CA4\u0C4B\u0CB0\u0CBF\u0CB8\u0CC1\"\n- \"Show criminal network for Ravi Kumar\"\n\nAfter a search, follow up with **\"only female victims\"** or **\"sirf open cases\"**. Type **help** for everything.",
       suggestions: [
         'What can you do?',
         'Show recent chain snatching cases',
@@ -170,7 +170,7 @@ export function ChatPage() {
             AI Crime Intelligence Chat
           </h1>
           <p className="text-xs text-gray-500 mt-0.5">
-            English + Hinglish · voice enabled · hybrid NLU + RAG
+            English + Hinglish + Kannada · voice enabled · multi-turn context
           </p>
         </div>
         <div className="flex items-center gap-3">
