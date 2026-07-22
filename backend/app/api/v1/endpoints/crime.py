@@ -134,6 +134,18 @@ async def get_fir(
     return FIRResponse.model_validate(fir)
 
 
+@router.get("/stations")
+async def list_stations(
+    current_user: User = Depends(get_current_user),
+):
+    """List available police stations for filtering."""
+    from app.db.stations import KARNATAKA_STATIONS
+    return [
+        {"station_code": s["station_code"], "station_name": s["station_name"], "zone": s["zone"], "city": s["city"]}
+        for s in KARNATAKA_STATIONS
+    ]
+
+
 @router.get("/firs/search-by-number")
 async def search_fir_by_number(
     q: str = Query(..., min_length=1),

@@ -668,14 +668,18 @@ async def convert_complaint_to_fir(
     law_sections = json.loads(complaint.ai_law_sections) if complaint.ai_law_sections else []
     fir_number = f"KSP-PUB-{datetime.now().strftime('%Y')}-{uuid.uuid4().hex[:6].upper()}"
 
+    # Auto-assign to the officer's station (who is converting), not generic "PUB-INTAKE"
+    officer_station = current_user.station_id or complaint.police_station_code or "BLR_CYB_PS"
+    officer_zone = current_user.assigned_zone or complaint.zone or "Central"
+
     fir = FIR(
         fir_number=fir_number,
-        station_id="PUB-INTAKE",
-        station_name="Public Portal Intake — Bengaluru Cyber Cell",
+        station_id=officer_station,
+        station_name=f"Converted from Public Complaint by {current_user.full_name}",
         district=complaint.district or "Bengaluru Urban",
         crime_type=complaint.ai_crime_type or "general complaint",
         description=complaint.description,
-        modus_operandi="Filed via public portal; pending investigation for full details.",
+        modus_operandi="Filed via public portal; converted to FIR by investigating officer.",
         date_of_occurrence=complaint.submitted_at or datetime.now(),
         location_name=complaint.location_name,
         status="open",
@@ -684,6 +688,8 @@ async def convert_complaint_to_fir(
         complainant_name=complaint.complainant_name,
         complainant_phone=complaint.complainant_phone,
         complainant_email=complaint.complainant_email,
+        zone=officer_zone,
+        police_station_code=officer_station,
     )
     db.add(fir)
     complaint.status = "under_review"

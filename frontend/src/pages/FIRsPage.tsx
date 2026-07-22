@@ -10,16 +10,18 @@ export function FIRsPage() {
   const [search, setSearch] = useState('')
   const [crimeType, setCrimeType] = useState('')
   const [status, setStatus] = useState('')
+  const [allStations, setAllStations] = useState(false)
   const [page, setPage] = useState(1)
   const { user } = useAuthStore()
   const isCitizen = user?.role === 'citizen'
 
   const { data, isLoading } = useQuery({
-    queryKey: ['firs', search, crimeType, status, page],
+    queryKey: ['firs', search, crimeType, status, allStations, page],
     queryFn: () => crimeAPI.listFIRs({
       search: search || undefined,
       crime_type: crimeType || undefined,
       status: status || undefined,
+      all_stations: allStations || undefined,
       page,
       limit: 20,
     }),
@@ -74,6 +76,14 @@ export function FIRsPage() {
       >
         Export PDF
       </button>
+      {!isCitizen && (
+        <button
+          onClick={() => setAllStations(!allStations)}
+          className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${allStations ? 'bg-orange-600 text-white border-orange-500' : 'border-dark-600 text-gray-400 hover:text-white'}`}
+        >
+          {allStations ? '🔓 All Stations' : `🔒 ${user?.station_id?.replace(/_/g, ' ') || 'My Station'}`}
+        </button>
+      )}
       </div>
       <div className="glass-card p-4">
         <div className="flex flex-wrap gap-3">
