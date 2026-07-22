@@ -647,6 +647,125 @@ class SmokeTest:
 
         self.check("Citizen can use deepfake verification", citizen_deepfake_allowed)
 
+    def test_public_portal(self) -> None:
+        """Public portal features (no authentication required)."""
+
+        def register_complaint():
+            data = self.expect_json(
+                self.request(
+                    "POST",
+                    "public/complaint",
+                    json_body={
+                        "complainant_name": "Smoke Test Citizen",
+                        "complainant_phone": "9999999999",
+                        "description": "I lost 50000 rupees to an online investment fraud scheme where a fake website promised high returns and then blocked my account.",
+                        "location_name": "Koramangala",
+                    },
+                )
+            )
+            self.require(data.get("complaint_number", "").startswith("PUB/"), "complaint number not generated")
+            self.require(data.get("ai_crime_type") == "fraud", f"AI misclassified complaint: {data.get('ai_crime_type')}")
+            self.require(data.get("law_violated") is True, "AI failed to detect law violation")
+            self.require(bool(data.get("ai_law_sections")), "no law sections returned")
+            self.require(0 < data.get("ai_confidence", 0) <= 1, "invalid AI confidence")
+            return data
+
+        complaint = self.check("Public complaint registration + AI classification", register_complaint)
+
+        def track_complaint():
+            self.require(complaint is not None, "complaint fixture unavailable")
+            number = complaint["complaint_number"]
+            data = self.expect_json(self.request("GET", f"public/complaint/{number}"))
+            self.require(data.get("complaint_number") == number, "complaint tracking mismatch")
+            self.require(data.get("status") == "pending", "new complaint should be pending")
+
+        self.check("Public complaint tracking by number", track_complaint)
+
+        def public_complaint_list():
+            # Newly filed complaints are NOT public yet (only after 7 days), so
+            # this should return a list (possibly empty) without leaking data.
+            data = self.expect_json(self.request("GET", "public/complaints"))
+            self.require(isinstance(data, list), "public complaints must be a list")
+            for item in data:
+                self.require("complainant_phone" not in item, "public list leaks phone numbers")
+                self.require("complainant_email" not in item, "public list leaks emails")
+
+        self.check("Public complaints list hides personal data", public_complaint_list)
+
+        def no_law_complaint():
+            data = self.expect_json(
+                self.request(
+                    "POST",
+                    "public/complaint",
+                    json_body={
+                        "complainant_name": "Test User",
+                        "description": "I just want to share some general feedback about the neighbourhood park cleanliness today.",
+                    },
+                )
+            )
+            self.require(data.get("law_violated") is False, "should not flag a non-crime as law violation")
+
+        self.check("Public complaint with no law violation", no_law_complaint)
+
+        def scam_detected():
+            data = self.expect_json(
+                self.request(
+                    "POST",
+                    "public/scam-detect",
+                    json_body={
+                        "content": "URGENT: Please share your OTP and verification code to verify OTP for your bank account.",
+                        "source": "sms",
+                    },
+                )
+            )
+            self.require(data.get("is_scam") is True, "clear OTP scam not detected")
+            self.require(data.get("scam_type") == "otp_fraud", f"wrong scam type: {data.get('scam_type')}")
+            self.require(data.get("confidence", 0) >= 0.6, "scam confidence too low")
+            self.require(bool(data.get("advisory")), "no advisory returned")
+            self.require(bool(data.get("report_links")), "no report links returned")
+
+        self.check("Scam detection flags OTP fraud", scam_detected)
+
+        def scam_clean():
+            data = self.expect_json(
+                self.request(
+                    "POST",
+                    "public/scam-detect",
+                    json_body={"content": "Hey, are we still meeting for lunch tomorrow at 1pm?", "source": "whatsapp"},
+                )
+            )
+            self.require(data.get("is_scam") is False, "benign message wrongly flagged as scam")
+
+        self.check("Scam detection passes benign message", scam_clean)
+
+        def case_similarity():
+            # FIR id 1 always exists in the seed set.
+            data = self.expect_json(self.request("GET", "public/case-similarity/1"))
+            self.require(data.get("source_fir", {}).get("id") == 1, "source FIR mismatch")
+            self.require("similar_cases" in data, "similar_cases missing")
+            self.require(isinstance(data.get("similar_cases"), list), "similar_cases must be a list")
+
+        self.check("Case similarity engine", case_similarity)
+
+        def cctv_match():
+            body, multipart_type = self.multipart("suspect.png", TINY_PNG, "image/png")
+            data = self.expect_json(
+                self.request("POST", "public/cctv-match", body=body, headers={"Content-Type": multipart_type})
+            )
+            self.require(data.get("total_suspects_scanned", 0) >= 40, "CCTV did not scan accused database")
+            self.require("matches" in data, "CCTV matches field missing")
+            self.require(isinstance(data.get("matches"), list), "CCTV matches must be a list")
+            # Deterministic: same image => same matches
+            data2 = self.expect_json(
+                self.request("POST", "public/cctv-match", body=body, headers={"Content-Type": multipart_type})
+            )
+            self.require(
+                [m["accused_id"] for m in data.get("matches", [])] == [m["accused_id"] for m in data2.get("matches", [])],
+                "CCTV matching is not deterministic",
+            )
+
+        self.check("CCTV suspect face matching", cctv_match)
+
     def run(self) -> int:
         print(f"PRAHARI smoke test\nBackend:  {self.base_url}")
         if self.frontend_url:
@@ -657,6 +776,7 @@ class SmokeTest:
         self.test_authentication()
         accused_id, police_fir_ids = self.test_police_features()
         self.test_citizen_boundaries(accused_id, police_fir_ids)
+        self.test_public_portal()
         print("-" * 72)
         print(f"RESULT: {self.passed} passed, {self.failed} failed")
         if self.failed:
