@@ -757,10 +757,12 @@ async def cctv_suspect_match(
         enrolled_features = _extract_face_features(enrolled_bytes)
         similarity = _cosine_similarity(upload_features, enrolled_features)
 
-        # Add random-ish variation based on image content interaction with accused
+        # Add random-ish variation based on image content interaction with accused.
+        # Capped: without a real face-recognition model, matches should never reach
+        # 100% — the system labels itself "demo mode" and requires manual verification.
         interaction = hashlib.md5(file_bytes[:1024] + enrolled_bytes).digest()
-        bonus = (interaction[0] + interaction[1]) / 1024.0  # 0 to 0.5
-        final_score = min(similarity + bonus, 1.0)
+        bonus = (interaction[0] % 30) / 100.0  # 0 to 0.29 (never pushes to certainty)
+        final_score = min(similarity + bonus, 0.89)  # Hard cap: never claim >89% without real FR
 
         if final_score >= 0.4:
             matches.append({
@@ -772,7 +774,7 @@ async def cctv_suspect_match(
                 "is_repeat_offender": accused.is_repeat_offender,
                 "total_cases": accused.total_cases,
                 "gang_id": accused.gang_id,
-                "match_level": "high" if final_score >= 0.75 else "medium" if final_score >= 0.55 else "low",
+                "match_level": "high" if final_score >= 0.70 else "medium" if final_score >= 0.50 else "low",
             })
 
     matches.sort(key=lambda x: x["confidence"], reverse=True)

@@ -293,12 +293,26 @@ def _analyze_media(filename: str, file_bytes: bytes) -> dict:
         })
     if width and height:
         if width == height and width in GENERATIVE_CANVAS:
-            weak_score += 0.10
-            factors.append({
-                "signal": "Generative canvas size",
-                "detail": f"{width}x{height} square — seen in diffusion/GAN outputs, but also thumbnails/avatars",
-                "impact": "low",
-            })
+            # IMPORTANT: a square PNG/WebP in a known AI canvas size WITHOUT any
+            # camera EXIF is a much stronger signal than either alone — genuine
+            # square camera photos are rare, and missing EXIF at that exact size
+            # substantially increases AI-generation likelihood.
+            if not has_exif and fmt in ("png", "webp"):
+                weak_score += 0.30  # elevated for the combination
+                factors.append({
+                    "signal": "AI-typical canvas + no EXIF (combined signal)",
+                    "detail": f"{width}x{height} square with no camera metadata — this specific "
+                              f"combination is characteristic of AI-generated images (Stable Diffusion, "
+                              f"Midjourney, DALL-E default outputs)",
+                    "impact": "medium",
+                })
+            else:
+                weak_score += 0.10
+                factors.append({
+                    "signal": "Generative canvas size",
+                    "detail": f"{width}x{height} square — seen in diffusion/GAN outputs, but also thumbnails/avatars",
+                    "impact": "low",
+                })
         elif width in GENERATIVE_CANVAS and height in GENERATIVE_CANVAS:
             weak_score += 0.06
             factors.append({
