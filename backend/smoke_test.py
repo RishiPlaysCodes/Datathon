@@ -348,7 +348,7 @@ class SmokeTest:
             self.require(bool(firs), "FIR fixture unavailable")
             crime_type = firs[0]["crime_type"]
             data = self.expect_json(
-                self.request("GET", "crime/firs", token=token, query={"crime_type": crime_type, "search": firs[0]["fir_number"], "limit": 20})
+                self.request("GET", "crime/firs", token=token, query={"crime_type": crime_type, "search": firs[0]["fir_number"], "limit": 20, "all_stations": "true"})
             )
             self.require(data.get("total", 0) >= 1, "FIR filters returned no matching record")
 
