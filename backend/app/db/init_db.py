@@ -10,10 +10,11 @@ sys.path.insert(0, ".")
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.db.session import engine, async_session, Base
-from app.models.user import User, AuditLog, ConversationHistory
+from app.models.user import User, AuditLog, ConversationHistory, PoliceStation
 from app.models.crime import FIR, Accused, Victim, FIRAccusedLink, CriminalNetwork, Transaction
 from app.core.security import get_password_hash, compute_audit_hash
 from app.db.seed import generate_accused, generate_firs, generate_network_links, generate_transactions
+from app.db.stations import KARNATAKA_STATIONS, get_zone_for_location, get_station_for_location
 from datetime import datetime
 import random
 import json
@@ -29,6 +30,7 @@ async def init_database():
 
     print("Seeding data...")
     async with async_session() as db:
+        await seed_police_stations(db)
         await seed_users(db)
         accused_list = await seed_accused(db)
         await seed_firs(db, accused_list)
@@ -40,6 +42,15 @@ async def init_database():
     print("Database seeded successfully!")
 
 
+async def seed_police_stations(db: AsyncSession):
+    """Seed 50 Karnataka police stations from master data."""
+    for station_data in KARNATAKA_STATIONS:
+        station = PoliceStation(**station_data)
+        db.add(station)
+    await db.flush()
+    print(f"  Created {len(KARNATAKA_STATIONS)} police stations")
+
+
 async def seed_users(db: AsyncSession):
     """Create default users for each role."""
     users = [
@@ -48,8 +59,10 @@ async def seed_users(db: AsyncSession):
             "email": "admin@prahari.ksp.gov.in",
             "full_name": "SP Raghavendra",
             "role": "supervisor",
-            "station_id": "STN_001",
+            "station_id": "KOR_PS",
             "badge_number": "KSP-SP-001",
+            "rank": "SP",
+            "assigned_zone": "South",
             "password": "admin123",
         },
         {
@@ -57,8 +70,10 @@ async def seed_users(db: AsyncSession):
             "email": "inspector@prahari.ksp.gov.in",
             "full_name": "Inspector Sharma",
             "role": "investigator",
-            "station_id": "STN_001",
+            "station_id": "KOR_PS",
             "badge_number": "KSP-INS-042",
+            "rank": "Inspector",
+            "assigned_zone": "South",
             "password": "inspector123",
         },
         {
@@ -66,8 +81,10 @@ async def seed_users(db: AsyncSession):
             "email": "analyst@prahari.ksp.gov.in",
             "full_name": "Data Analyst Priya",
             "role": "analyst",
-            "station_id": "STN_001",
+            "station_id": "KOR_PS",
             "badge_number": "KSP-AN-015",
+            "rank": "Analyst",
+            "assigned_zone": "South",
             "password": "analyst123",
         },
         {
@@ -75,17 +92,21 @@ async def seed_users(db: AsyncSession):
             "email": "constable@prahari.ksp.gov.in",
             "full_name": "Constable Venkatesh",
             "role": "constable",
-            "station_id": "STN_002",
+            "station_id": "IND_PS",
             "badge_number": "KSP-CON-201",
+            "rank": "Constable",
+            "assigned_zone": "East",
             "password": "constable123",
         },
         {
             "username": "demo",
             "email": "demo@prahari.ksp.gov.in",
-            "full_name": "Demo User",
+            "full_name": "Demo User (Koramangala PS)",
             "role": "investigator",
-            "station_id": "STN_001",
+            "station_id": "KOR_PS",
             "badge_number": "KSP-DEMO-001",
+            "rank": "SI",
+            "assigned_zone": "South",
             "password": "demo123",
         },
         {
@@ -95,6 +116,8 @@ async def seed_users(db: AsyncSession):
             "role": "citizen",
             "station_id": None,
             "badge_number": None,
+            "rank": None,
+            "assigned_zone": None,
             "password": "citizen123",
         },
     ]
@@ -168,6 +191,9 @@ async def seed_firs(db: AsyncSession, accused_list: list):
             data["complainant_user_id"] = None
 
         fir = FIR(**data)
+        # Auto-assign zone and police station from location
+        fir.zone = get_zone_for_location(data.get("location_name", ""))
+        fir.police_station_code = get_station_for_location(data.get("location_name", ""))
         db.add(fir)
         await db.flush()
 

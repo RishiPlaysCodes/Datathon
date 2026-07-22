@@ -1,7 +1,23 @@
 """User and AuditLog models."""
-from sqlalchemy import Column, Integer, String, DateTime, Text, Boolean
+from sqlalchemy import Column, Integer, String, DateTime, Text, Boolean, Float
 from sqlalchemy.sql import func
 from app.db.session import Base
+
+
+class PoliceStation(Base):
+    """Master data for Karnataka police stations."""
+    __tablename__ = "police_stations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    station_code = Column(String(20), unique=True, index=True, nullable=False)
+    station_name = Column(String(255), nullable=False)
+    zone = Column(String(50), nullable=False)  # South, East, West, North, Central, etc.
+    city = Column(String(100), nullable=False)
+    district = Column(String(100), nullable=False)
+    latitude = Column(Float, nullable=True)
+    longitude = Column(Float, nullable=True)
+    contact_number = Column(String(20), nullable=True)
+    officer_count = Column(Integer, nullable=True)
 
 
 class User(Base):
@@ -13,8 +29,10 @@ class User(Base):
     hashed_password = Column(String(255), nullable=False)
     full_name = Column(String(255), nullable=False)
     role = Column(String(50), nullable=False, default="investigator")
-    station_id = Column(String(50), nullable=True)
+    station_id = Column(String(50), nullable=True)  # station_code from police_stations
     badge_number = Column(String(50), nullable=True)
+    rank = Column(String(50), nullable=True)  # Constable/ASI/SI/Inspector/DSP/SP
+    assigned_zone = Column(String(50), nullable=True)  # auto-populated from station
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

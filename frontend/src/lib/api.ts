@@ -121,6 +121,10 @@ export const crimeAPI = {
     const { data } = await api.get(`/crime/accused/${id}/profile`)
     return data
   },
+  getFIRReport: async (firId: number, regenerate = false) => {
+    const { data } = await api.get(`/crime/firs/${firId}/report`, { params: { regenerate } })
+    return data
+  },
   getNetwork: async (accusedId: number, depth = 2): Promise<NetworkGraph> => {
     const { data } = await api.get(`/crime/network/${accusedId}`, { params: { depth } })
     return data

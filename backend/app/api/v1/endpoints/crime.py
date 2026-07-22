@@ -1,4 +1,5 @@
 """Crime data endpoints: FIRs, accused, analytics, network."""
+import json
 from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, text, and_
@@ -37,12 +38,17 @@ async def list_firs(
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
     search: Optional[str] = None,
+    station: Optional[str] = None,
+    zone: Optional[str] = None,
+    all_stations: bool = False,
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """List FIRs with filters. Citizens only see their own FIRs."""
+    """List FIRs with filters. Zone-based default: officers see their station's FIRs.
+    Pass all_stations=true to see all (audit-logged for non-supervisors).
+    """
     query = select(FIR)
     count_query = select(func.count(FIR.id))
 
@@ -51,6 +57,20 @@ async def list_firs(
     # CITIZEN ROLE: can only see FIRs they filed (linked by complainant_user_id)
     if current_user.role == "citizen":
         conditions.append(FIR.complainant_user_id == current_user.id)
+    elif not all_stations:
+        # ZONE-BASED DEFAULT: police see only their station/zone by default
+        if station:
+            conditions.append(FIR.police_station_code == station)
+        elif zone:
+            conditions.append(FIR.zone == zone)
+        elif current_user.role == "supervisor":
+            # Supervisors see their zone by default (all subordinate stations)
+            if current_user.assigned_zone:
+                conditions.append(FIR.zone == current_user.assigned_zone)
+        else:
+            # Constable/Investigator/Analyst: default to their assigned station
+            if current_user.station_id:
+                conditions.append(FIR.police_station_code == current_user.station_id)
 
     if crime_type:
         conditions.append(FIR.crime_type.ilike(f"%{crime_type}%"))
@@ -74,6 +94,7 @@ async def list_firs(
         conditions.append(
             (FIR.description.ilike(f"%{search}%"))
             | (FIR.fir_number.ilike(f"%{search}%"))
+            | (FIR.complainant_name.ilike(f"%{search}%"))
             | (FIR.modus_operandi.ilike(f"%{search}%"))
         )
 
@@ -111,6 +132,83 @@ async def get_fir(
     if current_user.role == "citizen" and fir.complainant_user_id != current_user.id:
         raise HTTPException(status_code=403, detail="You can only access FIRs filed by your account")
     return FIRResponse.model_validate(fir)
+
+
+@router.get("/firs/search-by-number")
+async def search_fir_by_number(
+    q: str = Query(..., min_length=1),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_role("constable")),
+):
+    """Search FIRs by FIR number (partial match) or complainant name.
+    Returns matching FIRs for Investigation Support.
+    """
+    # Normalize query
+    search_term = q.strip().replace("/", "%").replace("-", "%")
+    results = (
+        await db.execute(
+            select(FIR)
+            .where(
+                (FIR.fir_number.ilike(f"%{search_term}%"))
+                | (FIR.complainant_name.ilike(f"%{q.strip()}%"))
+            )
+            .order_by(FIR.date_of_occurrence.desc())
+            .limit(20)
+        )
+    ).scalars().all()
+
+    return [
+        {
+            "id": f.id,
+            "fir_number": f.fir_number,
+            "crime_type": f.crime_type,
+            "location_name": f.location_name,
+            "station_name": f.station_name,
+            "status": f.status,
+            "date_of_occurrence": f.date_of_occurrence.isoformat() if f.date_of_occurrence else None,
+            "complainant_name": f.complainant_name,
+            "zone": f.zone,
+        }
+        for f in results
+    ]
+
+
+@router.get("/firs/{fir_id}/report")
+async def get_fir_investigation_report(
+    fir_id: int,
+    regenerate: bool = False,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_role("constable")),
+):
+    """Get (or generate) the AI Investigation Report for a FIR.
+
+    The report covers 9 sections: case summary, crime classification, similar
+    cases, network analysis, hotspot analysis, recommended actions, prevention
+    measures, financial trail, and cyber crime analysis. All findings are
+    grounded in actual database records.
+    """
+    result = await db.execute(select(FIR).where(FIR.id == fir_id))
+    fir = result.scalar_one_or_none()
+    if not fir:
+        raise HTTPException(status_code=404, detail="FIR not found")
+
+    # Return cached report if available and regeneration not requested
+    if fir.ai_report_generated and fir.ai_report_content and not regenerate:
+        try:
+            return json.loads(fir.ai_report_content)
+        except (json.JSONDecodeError, TypeError):
+            pass  # Regenerate if cached content is corrupted
+
+    # Generate fresh report
+    from app.services.investigation_report import generate_investigation_report
+    report = await generate_investigation_report(db, fir)
+
+    # Cache the report in the FIR record
+    fir.ai_report_generated = True
+    fir.ai_report_content = json.dumps(report, default=str)
+    await db.commit()
+
+    return report
 
 
 @router.get("/accused", response_model=List[AccusedResponse])
@@ -262,35 +360,49 @@ async def resolve_entity(
 @router.get("/analytics/dashboard", response_model=AnalyticsDashboard)
 async def get_analytics_dashboard(
     district: Optional[str] = None,
+    station: Optional[str] = None,
+    zone: Optional[str] = None,
+    all_stations: bool = False,
     days: int = Query(90, ge=7, le=365),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_role("constable")),
 ):
-    """Get analytics dashboard data."""
+    """Get analytics dashboard data. Zone-filtered by default."""
     date_from = datetime.now() - timedelta(days=days)
 
-    # Base conditions
-    conditions = [FIR.date_of_occurrence >= date_from]
+    # Build base conditions with zone filtering
+    base_conditions = [FIR.date_of_occurrence >= date_from]
     if district:
-        conditions.append(FIR.district.ilike(f"%{district}%"))
+        base_conditions.append(FIR.district == district)
+    if not all_stations and current_user.role != "citizen":
+        if station:
+            base_conditions.append(FIR.police_station_code == station)
+        elif zone:
+            base_conditions.append(FIR.zone == zone)
+        elif current_user.role == "supervisor":
+            if current_user.assigned_zone:
+                base_conditions.append(FIR.zone == current_user.assigned_zone)
+        else:
+            if current_user.station_id:
+                base_conditions.append(FIR.police_station_code == current_user.station_id)
 
     # Total FIRs
     total_result = await db.execute(
-        select(func.count(FIR.id)).where(and_(*conditions))
+        select(func.count(FIR.id)).where(and_(*base_conditions))
     )
     total_firs = total_result.scalar() or 0
 
     # Active cases
     active_result = await db.execute(
         select(func.count(FIR.id)).where(
-            and_(*conditions, FIR.status.in_(["open", "investigating"]))
+            and_(*base_conditions, FIR.status.in_(["open", "investigating"]))
         )
     )
     active_cases = active_result.scalar() or 0
 
     # Closed cases
     closed_result = await db.execute(
-        select(func.count(FIR.id)).where(and_(*conditions, FIR.status == "closed"))
+        select(func.count(FIR.id)).where(and_(*base_conditions, FIR.status == "closed"))
     )
     closed_cases = closed_result.scalar() or 0
 
@@ -303,7 +415,7 @@ async def get_analytics_dashboard(
     # Top crime types
     crime_type_result = await db.execute(
         select(FIR.crime_type, func.count(FIR.id).label("count"))
-        .where(and_(*conditions))
+        .where(and_(*base_conditions))
         .group_by(FIR.crime_type)
         .order_by(func.count(FIR.id).desc())
         .limit(10)
@@ -321,7 +433,7 @@ async def get_analytics_dashboard(
             FIR.location_name,
             func.count(FIR.id).label("count"),
         )
-        .where(and_(*conditions, FIR.latitude.isnot(None)))
+        .where(and_(*base_conditions, FIR.latitude.isnot(None)))
         .group_by(FIR.latitude, FIR.longitude, FIR.crime_type, FIR.location_name)
         .order_by(func.count(FIR.id).desc())
         .limit(50)
@@ -346,7 +458,7 @@ async def get_analytics_dashboard(
             FIR.crime_type,
             func.count(FIR.id).label("count"),
         )
-        .where(and_(*conditions))
+        .where(and_(*base_conditions))
         .group_by("day", FIR.crime_type)
         .order_by("day")
     )
@@ -358,7 +470,7 @@ async def get_analytics_dashboard(
     # District stats
     district_result = await db.execute(
         select(FIR.district, func.count(FIR.id).label("count"))
-        .where(and_(*conditions))
+        .where(and_(*base_conditions))
         .group_by(FIR.district)
         .order_by(func.count(FIR.id).desc())
     )
@@ -381,16 +493,25 @@ async def get_analytics_dashboard(
 @router.get("/analytics/hotspots", response_model=List[HotspotData])
 async def get_hotspots(
     crime_type: Optional[str] = None,
+    all_stations: bool = False,
     days: int = Query(90, ge=7, le=365),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_role("constable")),
 ):
-    """Get crime hotspot data for heatmap."""
+    """Get crime hotspot data for heatmap. Zone-filtered by default."""
     date_from = datetime.now() - timedelta(days=days)
     conditions = [FIR.date_of_occurrence >= date_from, FIR.latitude.isnot(None)]
 
     if crime_type:
         conditions.append(FIR.crime_type.ilike(f"%{crime_type}%"))
+
+    # Zone filtering
+    if not all_stations:
+        if current_user.role == "supervisor":
+            if current_user.assigned_zone:
+                conditions.append(FIR.zone == current_user.assigned_zone)
+        elif current_user.station_id:
+            conditions.append(FIR.police_station_code == current_user.station_id)
 
     result = await db.execute(
         select(
