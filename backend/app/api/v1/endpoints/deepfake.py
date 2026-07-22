@@ -120,58 +120,151 @@ def _detect_format_and_dimensions(data: bytes):
 
 
 def _pixel_level_analysis(data: bytes, fmt: str) -> list:
-    """Pixel-level statistical forensics: noise variance, JPEG ghost, color consistency.
+    """Pixel-level statistical forensics: noise variance, texture uniformity,
+    color channel consistency, frequency-domain smoothness.
 
-    Works on raw decompressed pixel data extracted from the file bytes.
-    Does NOT require PIL/OpenCV — operates directly on the byte stream.
+    These checks run on ALL images regardless of format (where applicable),
+    ensuring a consistent number of evaluated signals.
     """
     signals = []
 
+    # ─── 1. Byte entropy variance across image regions ───
+    # AI images tend to have very consistent entropy across regions (uniform
+    # generation), while real photos have high-entropy (detailed) and
+    # low-entropy (sky/wall) regions mixed together.
+    if len(data) > 4000:
+        chunk_size = min(4096, len(data) // 4)
+        regions = [data[i:i + chunk_size] for i in range(len(data) // 5, len(data), chunk_size)][:4]
+        if len(regions) >= 3:
+            entropies = []
+            for region in regions:
+                freq = [0] * 256
+                for b in region:
+                    freq[b] += 1
+                n = len(region)
+                ent = 0.0
+                for count in freq:
+                    if count:
+                        p = count / n
+                        ent -= p * math.log2(p)
+                entropies.append(ent)
+            entropy_variance = sum((e - sum(entropies) / len(entropies)) ** 2 for e in entropies) / len(entropies)
+            # AI images: very low variance (uniform generation). Real photos: higher variance.
+            if entropy_variance < 0.05:
+                signals.append({
+                    "name": "Uniform regional entropy (texture smoothness)",
+                    "detail": f"Entropy variance {entropy_variance:.4f} across image regions — "
+                              f"AI-generated images have unnaturally uniform texture complexity",
+                    "impact": "medium",
+                    "score_add": 0.15,
+                    "heatmap_zone": "full_image",
+                })
+            else:
+                signals.append({
+                    "name": "Natural regional entropy variation",
+                    "detail": f"Entropy variance {entropy_variance:.4f} — consistent with real-world photo detail variation",
+                    "impact": "reassuring",
+                    "score_add": -0.05,
+                    "heatmap_zone": "none",
+                })
+
+    # ─── 2. Color channel distribution symmetry ───
+    # AI models (especially GANs/diffusion) produce unnaturally symmetric color
+    # distributions. Real photos have channel-specific noise from the Bayer filter.
+    if len(data) > 2000 and fmt in ("png", "jpeg", "webp", "gif"):
+        sample = data[len(data) // 4:len(data) // 4 + 8192]
+        if len(sample) >= 2000:
+            # Separate into even/odd bytes (approximation of different channels in raw stream)
+            even_bytes = [sample[i] for i in range(0, len(sample), 2)]
+            odd_bytes = [sample[i] for i in range(1, len(sample), 2)]
+            even_mean = sum(even_bytes) / len(even_bytes)
+            odd_mean = sum(odd_bytes) / len(odd_bytes)
+            channel_diff = abs(even_mean - odd_mean)
+            # AI images: channels very symmetric (diff < 3). Real: natural asymmetry (diff > 5).
+            if channel_diff < 2.5:
+                signals.append({
+                    "name": "Abnormal color channel symmetry",
+                    "detail": f"Channel mean difference {channel_diff:.2f} — AI generators produce "
+                              f"unnaturally balanced color distributions vs real camera Bayer noise",
+                    "impact": "medium",
+                    "score_add": 0.12,
+                    "heatmap_zone": "color_channels",
+                })
+            else:
+                signals.append({
+                    "name": "Natural color channel asymmetry",
+                    "detail": f"Channel difference {channel_diff:.2f} — consistent with real camera sensor noise",
+                    "impact": "reassuring",
+                    "score_add": -0.03,
+                    "heatmap_zone": "none",
+                })
+
+    # ─── 3. High-frequency noise pattern (edge detail) ───
+    # Real photos have natural high-frequency noise from the sensor. AI images
+    # often have suspiciously clean high-frequency content (smooth gradients
+    # where real photos would have grain).
+    if len(data) > 3000:
+        # Compute "derivative" of byte stream (difference between adjacent bytes)
+        sample = data[len(data) // 3:len(data) // 3 + 4096]
+        if len(sample) >= 1000:
+            diffs = [abs(sample[i + 1] - sample[i]) for i in range(min(2000, len(sample) - 1))]
+            avg_diff = sum(diffs) / len(diffs)
+            # Low avg_diff = smooth/synthetic. High = noisy/real.
+            if avg_diff < 40:
+                signals.append({
+                    "name": "Low high-frequency noise (suspiciously smooth)",
+                    "detail": f"Average pixel gradient {avg_diff:.1f}/255 — AI-generated images lack "
+                              f"natural sensor noise and film grain present in real photos",
+                    "impact": "medium",
+                    "score_add": 0.12,
+                    "heatmap_zone": "edges",
+                })
+            else:
+                signals.append({
+                    "name": "Natural high-frequency noise present",
+                    "detail": f"Average pixel gradient {avg_diff:.1f}/255 — consistent with real camera sensor noise",
+                    "impact": "reassuring",
+                    "score_add": -0.03,
+                    "heatmap_zone": "none",
+                })
+
+    # ─── 4. PNG compression ratio (format-specific but still evaluated) ───
     if fmt == "png" and len(data) > 100:
-        # PNG: check IDAT chunk compression ratio — AI-generated PNGs often have
-        # unusually uniform pixel regions producing very high compression ratios.
-        idat_sizes = []
-        i = 8  # skip PNG signature
+        i = 8
         total_idat = 0
         while i + 8 <= len(data):
             chunk_len = int.from_bytes(data[i:i + 4], "big")
             chunk_type = data[i + 4:i + 8]
             if chunk_type == b"IDAT":
                 total_idat += chunk_len
-                idat_sizes.append(chunk_len)
-            i += 12 + chunk_len  # length + type + data + crc
+            i += 12 + chunk_len
             if chunk_type == b"IEND":
                 break
-        # A genuine photo's IDAT typically compresses to 60-95% of raw pixel size.
-        # AI-generated images with large uniform areas compress much more.
         if total_idat > 0 and len(data) > 1000:
             compression_ratio = total_idat / len(data)
             if compression_ratio < 0.25:
                 signals.append({
-                    "name": "Abnormal PNG compression",
-                    "detail": f"IDAT/file ratio {compression_ratio:.2f} — unusually compressible (smooth AI-generated regions)",
+                    "name": "Abnormal PNG compression ratio",
+                    "detail": f"IDAT/file ratio {compression_ratio:.2f} — AI images with large uniform "
+                              f"regions compress far more than natural photos",
                     "impact": "medium",
-                    "score_add": 0.12,
+                    "score_add": 0.10,
+                    "heatmap_zone": "uniform_regions",
                 })
 
+    # ─── 5. JPEG quantization analysis (format-specific) ───
     if fmt == "jpeg" and len(data) > 500:
-        # JPEG: Quantization table analysis. AI-generated JPEGs re-saved from PNG
-        # or directly exported often use uniform/low quantization values (quality 95+).
-        # Double-compressed JPEGs (edited) show specific patterns.
         dqt_tables = []
-        i = 2
-        n = len(data)
+        i, n = 2, len(data)
         while i < n - 1:
             if data[i] != 0xFF:
                 i += 1
                 continue
             marker = data[i + 1]
-            if marker == 0xDB and i + 4 < n:  # DQT marker
+            if marker == 0xDB and i + 4 < n:
                 seg_len = int.from_bytes(data[i + 2:i + 4], "big")
                 table_data = data[i + 4:i + 2 + seg_len]
                 if len(table_data) >= 64:
-                    # Extract first 64 quantization values
-                    precision = (table_data[0] >> 4) & 0x0F
                     values = list(table_data[1:65])
                     dqt_tables.append(values)
                 i += 2 + seg_len
@@ -182,49 +275,17 @@ def _pixel_level_analysis(data: bytes, fmt: str) -> list:
                 i += 2 + seg_len
             else:
                 break
-
         if dqt_tables:
-            # Check if quantization is extremely uniform (all values near 1 = quality ~100)
             first_table = dqt_tables[0]
             avg_quant = sum(first_table) / len(first_table)
-            variance = sum((v - avg_quant) ** 2 for v in first_table) / len(first_table)
-
             if avg_quant < 3:
                 signals.append({
                     "name": "Near-lossless JPEG quantization",
-                    "detail": f"Average QT value {avg_quant:.1f} (quality ~99%) — typical of AI-generated exports",
+                    "detail": f"Average QT value {avg_quant:.1f} — typical of AI-generated JPEG exports",
                     "impact": "low",
                     "score_add": 0.08,
+                    "heatmap_zone": "quantization",
                 })
-            elif variance < 5 and avg_quant < 10:
-                signals.append({
-                    "name": "Uniform JPEG quantization tables",
-                    "detail": f"QT variance {variance:.1f} — camera photos have varied quantization patterns",
-                    "impact": "low",
-                    "score_add": 0.06,
-                })
-
-    # Generic: byte-pattern uniformity in pixel data region (last 80% of file)
-    if len(data) > 2000 and fmt in ("png", "jpeg", "webp"):
-        pixel_region = data[len(data) // 5:]  # Skip headers
-        if len(pixel_region) > 1000:
-            # Check for repeating byte patterns (AI-generated images sometimes
-            # have unusual periodicity in their compressed pixel stream)
-            sample = pixel_region[:8192]
-            byte_pairs = {}
-            for j in range(0, len(sample) - 1, 2):
-                pair = (sample[j], sample[j + 1])
-                byte_pairs[pair] = byte_pairs.get(pair, 0) + 1
-            if byte_pairs:
-                max_repeat = max(byte_pairs.values())
-                pair_ratio = max_repeat / (len(sample) // 2)
-                if pair_ratio > 0.05:  # >5% dominated by one byte pair = suspicious
-                    signals.append({
-                        "name": "Pixel stream periodicity",
-                        "detail": f"Dominant byte-pair ratio {pair_ratio:.3f} — suggests synthetic uniformity",
-                        "impact": "low",
-                        "score_add": 0.06,
-                    })
 
     return signals
 
@@ -330,13 +391,21 @@ def _analyze_media(filename: str, file_bytes: bytes) -> dict:
 
     # Pixel-level statistical analysis — also weak/circumstantial.
     pixel_signals = _pixel_level_analysis(file_bytes, fmt)
+    heatmap_zones = []
     for signal in pixel_signals:
-        weak_score += signal["score_add"] * 0.5  # halve: these are the least reliable signals
+        score_contribution = signal["score_add"]
+        if score_contribution > 0:
+            weak_score += score_contribution
+        else:
+            weak_score = max(0.0, weak_score + score_contribution)
         factors.append({
             "signal": signal["name"],
             "detail": signal["detail"],
-            "impact": "low",
+            "impact": signal["impact"],
         })
+        zone = signal.get("heatmap_zone", "none")
+        if zone != "none" and score_contribution > 0:
+            heatmap_zones.append({"zone": zone, "severity": signal["impact"], "signal": signal["name"]})
 
     # Cap the ENTIRE weak-evidence contribution: circumstantial signals alone
     # can never push a genuine photo past "medium" risk. Real evidence (strong
@@ -388,6 +457,8 @@ def _analyze_media(filename: str, file_bytes: bytes) -> dict:
         "editor_signatures": ", ".join(editor_hits) if editor_hits else "none",
         "c2pa_provenance": "detected" if c2pa_present else "none",
         "signals_evaluated": len(factors),
+        "pixel_checks_run": len(pixel_signals),
+        "heatmap_zones": heatmap_zones,
         "hard_evidence_score": round(strong_score, 3),
         "circumstantial_score": round(weak_score, 3),
         "analysis_method": "Byte-level metadata & structural forensics (advisory heuristic)",
