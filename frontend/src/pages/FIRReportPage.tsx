@@ -4,7 +4,7 @@ import { crimeAPI } from '@/lib/api'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { FileText, RefreshCw, Download, Shield, Network, MapPin, Lightbulb, DollarSign, Globe, AlertTriangle, CheckCircle2, Clock, Users } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { exportToPdf, objectToTable } from '@/lib/pdfExport'
+import { exportToPdf, objectToTable, severityBadge, confidenceBar, arrayToTable } from '@/lib/pdfExport'
 
 export function FIRReportPage() {
   const [firId, setFirId] = useState('')
@@ -35,63 +35,157 @@ export function FIRReportPage() {
   const downloadPdf = () => {
     if (!report) return
     const content = `
-      <div class="section"><div class="section-title">1. Case Summary</div>
-        ${objectToTable(report.case_summary)}
+      <!-- Section 1: Case Summary -->
+      <div class="section">
+        <div class="section-title">1. CASE SUMMARY</div>
+        <div class="info-box">
+          <p>${report.case_summary?.summary || 'No summary available.'}</p>
+        </div>
+        <table>
+          <tr><th>Incident Date</th><td>${report.case_summary?.incident_date || '-'}</td><th>Location</th><td>${report.case_summary?.location || '-'}</td></tr>
+          <tr><th>Crime Type</th><td>${report.case_summary?.crime_type || '-'}</td><th>Status</th><td>${report.case_summary?.status || '-'}</td></tr>
+          <tr><th>Severity</th><td>${severityBadge(report.case_summary?.severity || 'medium')}</td><th>Zone</th><td>${report.case_summary?.zone || '-'}</td></tr>
+          <tr><th>Complainant</th><td>${report.case_summary?.complainant || '-'}</td><th>IO</th><td>${report.case_summary?.investigating_officer || 'To be assigned'}</td></tr>
+        </table>
+        ${report.case_summary?.modus_operandi && report.case_summary.modus_operandi !== 'Not specified' ? `<div class="info-box warning"><p><span class="label">Modus Operandi:</span> ${report.case_summary.modus_operandi}</p></div>` : ''}
       </div>
-      <div class="section"><div class="section-title">2. Crime Classification</div>
-        ${objectToTable(report.crime_classification)}
+
+      <!-- Section 2: Crime Classification -->
+      <div class="section">
+        <div class="section-title purple">2. CRIME CLASSIFICATION</div>
+        <table>
+          <tr><th>Primary Type</th><td><strong>${report.crime_classification?.primary_type || '-'}</strong></td></tr>
+          <tr><th>IPC Section</th><td>${report.crime_classification?.ipc_section || 'N/A'}</td></tr>
+          <tr><th>BNS Section</th><td>${report.crime_classification?.bns_section || 'N/A'}</td></tr>
+          <tr><th>Severity</th><td>${severityBadge(report.crime_classification?.severity || 'medium')}</td></tr>
+        </table>
+        <p style="margin-top:6px">AI Confidence: ${confidenceBar(report.crime_classification?.ai_confidence || 0.75)}</p>
+        <div class="info-box" style="margin-top:6px"><p style="font-size:9px;color:#6b7280">Confidence based on keyword match against FIR description, metadata analysis, and comparison with historical case patterns in the KSP database.</p></div>
       </div>
-      <div class="section"><div class="section-title">3. Similar Cases (${report.similar_cases?.length || 0} found)</div>
-        <table><thead><tr><th>FIR #</th><th>Crime</th><th>Location</th><th>Status</th><th>Score</th></tr></thead><tbody>
-        ${(report.similar_cases || []).map((c: any) => `<tr><td>${c.fir_number}</td><td>${c.crime_type}</td><td>${c.location || '-'}</td><td>${c.status}</td><td>${c.similarity_score}%</td></tr>`).join('')}
-        </tbody></table>
+
+      <!-- Section 3: Similar Cases -->
+      <div class="section">
+        <div class="section-title cyan">3. SIMILAR CASES IN DATABASE (${report.similar_cases?.length || 0} found)</div>
+        ${report.similar_cases?.length ? `
+          <table>
+            <thead><tr><th>FIR Number</th><th>Crime Type</th><th>Location</th><th>Status</th><th>Similarity</th><th>Key Learning</th></tr></thead>
+            <tbody>${report.similar_cases.map((c: any) => `
+              <tr>
+                <td><strong>${c.fir_number}</strong></td>
+                <td>${c.crime_type}</td>
+                <td>${c.location || '-'}</td>
+                <td>${c.status === 'closed' ? '<span class="badge badge-low">SOLVED</span>' : `<span class="badge badge-medium">${c.status}</span>`}</td>
+                <td>${c.similarity_score}%</td>
+                <td style="font-size:9px">${c.key_learning || '-'}</td>
+              </tr>`).join('')}
+            </tbody>
+          </table>` : '<p style="color:#6b7280">No sufficiently similar cases found in the database.</p>'}
       </div>
-      <div class="section"><div class="section-title">4. Criminal Network Analysis</div>
-        ${report.network_analysis?.linked_accused?.length
-          ? `<table><thead><tr><th>Name</th><th>Risk Score</th><th>Cases</th><th>Repeat?</th><th>Gang</th></tr></thead><tbody>
-             ${report.network_analysis.linked_accused.map((a: any) => `<tr><td>${a.name}</td><td>${a.risk_score?.toFixed(0)}/100</td><td>${a.total_cases}</td><td>${a.is_repeat_offender ? 'Yes' : 'No'}</td><td>${a.gang_id || '-'}</td></tr>`).join('')}
-             </tbody></table>
-             <p>Network size: ${report.network_analysis.total_network_size} connections</p>`
-          : '<p>No linked accused in database.</p>'}
+
+      <!-- Section 4: Criminal Network Analysis -->
+      <div class="section">
+        <div class="section-title red">4. CRIMINAL NETWORK ANALYSIS</div>
+        ${report.network_analysis?.linked_accused?.length ? `
+          <table>
+            <thead><tr><th>Name</th><th>Risk Score</th><th>Cases</th><th>Repeat?</th><th>Gang</th></tr></thead>
+            <tbody>${report.network_analysis.linked_accused.map((a: any) => `
+              <tr>
+                <td><strong>${a.name}</strong>${a.alias ? ` (${a.alias})` : ''}</td>
+                <td>${severityBadge(a.risk_score >= 80 ? 'critical' : a.risk_score >= 60 ? 'high' : a.risk_score >= 40 ? 'medium' : 'low')} ${a.risk_score?.toFixed(0)}/100</td>
+                <td>${a.total_cases}</td>
+                <td>${a.is_repeat_offender ? '🔴 Yes' : 'No'}</td>
+                <td>${a.gang_id || '-'}</td>
+              </tr>`).join('')}
+            </tbody>
+          </table>
+          ${report.network_analysis.gang_involvement ? `<div class="info-box danger"><p><span class="label">⚠️ Gang Involvement:</span> ${report.network_analysis.gang_involvement} | Network size: ${report.network_analysis.total_network_size} connections</p></div>` : ''}
+          ${report.network_analysis.network_connections?.length ? `<p style="margin-top:6px;font-size:10px"><strong>Associates:</strong> ${report.network_analysis.network_connections.map((c: any) => `${c.name} (${c.relationship}, ${c.total_cases} cases)`).join(' · ')}</p>` : ''}
+        ` : '<p style="color:#6b7280">No linked accused found in database for this FIR.</p>'}
       </div>
-      <div class="section"><div class="section-title">5. Hotspot Analysis</div>
-        ${objectToTable({
-          Location: report.hotspot_analysis?.location,
-          Density: report.hotspot_analysis?.density,
-          'Cases (90 days)': report.hotspot_analysis?.cases_in_90_days,
-          'Peak Time': report.hotspot_analysis?.peak_time_window,
-        })}
+
+      <!-- Section 5: Hotspot Analysis -->
+      <div class="section">
+        <div class="section-title orange">5. HOTSPOT ANALYSIS</div>
+        <table>
+          <tr><th>Location</th><td>${report.hotspot_analysis?.location || 'Not specified'}</td><th>Crime Density</th><td>${severityBadge(report.hotspot_analysis?.density === 'HIGH' ? 'critical' : report.hotspot_analysis?.density === 'MEDIUM' ? 'medium' : 'low')} ${report.hotspot_analysis?.density || 'Unknown'}</td></tr>
+          <tr><th>Cases in 90 Days</th><td>${report.hotspot_analysis?.cases_in_90_days || 0}</td><th>Peak Time Window</th><td><strong>${report.hotspot_analysis?.peak_time_window || 'Unknown'}</strong></td></tr>
+        </table>
+        ${report.hotspot_analysis?.is_hotspot ? `<div class="info-box danger"><p>🔴 <span class="label">ACTIVE HOTSPOT</span> — This location has ${report.hotspot_analysis.cases_in_90_days} cases in the last 90 days. Increased patrol recommended during ${report.hotspot_analysis.peak_time_window}.</p></div>` : ''}
       </div>
-      <div class="section"><div class="section-title">6. Recommended Investigation Actions</div>
-        <table><thead><tr><th>Priority</th><th>Action</th><th>Category</th></tr></thead><tbody>
-        ${(report.recommended_actions || []).map((a: any) => `<tr><td>P${a.priority}</td><td>${a.action}</td><td>${a.category}</td></tr>`).join('')}
-        </tbody></table>
+
+      <hr/>
+
+      <!-- Section 6: Recommended Actions -->
+      <div class="section">
+        <div class="section-title green">6. RECOMMENDED INVESTIGATION ACTIONS</div>
+        <table>
+          <thead><tr><th style="width:8%">Priority</th><th style="width:52%">Action</th><th style="width:20%">Category</th><th style="width:20%">Timeline</th></tr></thead>
+          <tbody>${(report.recommended_actions || []).map((a: any, i: number) => `
+            <tr class="priority-${Math.min(a.priority, 4)}">
+              <td><span class="badge ${a.priority <= 1 ? 'badge-critical' : a.priority <= 2 ? 'badge-high' : 'badge-medium'}">P${a.priority}</span></td>
+              <td>${a.action}</td>
+              <td>${a.category}</td>
+              <td>${a.priority <= 2 ? 'Within 24 hours' : a.priority <= 4 ? 'Within 72 hours' : 'Within 7 days'}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
       </div>
-      <div class="section"><div class="section-title">7. Prevention Measures</div>
-        <ul>${(report.prevention_measures || []).map((m: string) => `<li>${m}</li>`).join('')}</ul>
+
+      <!-- Section 7: Prevention Measures -->
+      <div class="section">
+        <div class="section-title green">7. CRIME PREVENTION MEASURES</div>
+        <ul>${(report.prevention_measures || []).map((m: string) => `<li class="check">${m}</li>`).join('')}</ul>
       </div>
+
+      <!-- Section 8: Financial Trail -->
       ${report.financial_trail?.applicable ? `
-      <div class="section"><div class="section-title">8. Financial Trail</div>
-        ${objectToTable({
-          'Loss Amount': report.financial_trail.loss_amount ? '₹' + report.financial_trail.loss_amount : 'N/A',
-          'Loss Type': report.financial_trail.loss_type || 'N/A',
-          'Transaction ID': report.financial_trail.transaction_id || 'N/A',
-          'Risk Flag': report.financial_trail.risk_flag || 'None',
-        })}
-      </div>` : ''}
+      <div class="section">
+        <div class="section-title orange">8. FINANCIAL TRAIL ANALYSIS</div>
+        <table>
+          <tr><th>Loss Amount</th><td><strong>${report.financial_trail.loss_amount ? '₹' + report.financial_trail.loss_amount.toLocaleString('en-IN') : 'N/A'}</strong></td><th>Type</th><td>${report.financial_trail.loss_type || 'N/A'}</td></tr>
+          <tr><th>Transaction ID</th><td>${report.financial_trail.transaction_id || 'N/A'}</td><th>Risk Flag</th><td>${report.financial_trail.risk_flag ? `<span class="badge badge-critical">${report.financial_trail.risk_flag}</span>` : 'None'}</td></tr>
+        </table>
+        ${report.financial_trail.suspicious_transactions?.length ? `
+          <p style="margin-top:6px;font-weight:600">Linked Transactions:</p>
+          <table><thead><tr><th>Amount</th><th>Type</th><th>From</th><th>To</th><th>Suspicious</th></tr></thead>
+          <tbody>${report.financial_trail.suspicious_transactions.map((t: any) => `<tr><td>₹${t.amount}</td><td>${t.type}</td><td>${t.from_account}</td><td>${t.to_account}</td><td>${t.is_suspicious ? '<span class="badge badge-critical">🚨 YES</span>' : 'No'}</td></tr>`).join('')}</tbody></table>
+        ` : ''}
+      </div>` : `
+      <div class="section">
+        <div class="section-title">8. FINANCIAL TRAIL</div>
+        <div class="info-box success"><p>No financial loss reported in this case.</p></div>
+      </div>`}
+
+      <!-- Section 9: Cyber Crime Analysis -->
       ${report.cyber_analysis?.applicable ? `
-      <div class="section"><div class="section-title">9. Cyber Crime Analysis</div>
-        <table><thead><tr><th>Attack Vector</th><th>Recommendation</th></tr></thead><tbody>
-        ${(report.cyber_analysis.attack_vectors || []).map((v: any) => `<tr><td>${v.type}</td><td>${v.recommendation}</td></tr>`).join('')}
-        </tbody></table>
-        <p>Report to: ${(report.cyber_analysis.recommended_report_to || []).join(', ')}</p>
-      </div>` : ''}
+      <div class="section">
+        <div class="section-title purple">9. CYBER CRIME ANALYSIS</div>
+        <table>
+          <thead><tr><th>Attack Vector</th><th>Recommendation</th></tr></thead>
+          <tbody>${(report.cyber_analysis.attack_vectors || []).map((v: any) => `<tr><td><strong>${v.type}</strong></td><td>${v.recommendation}</td></tr>`).join('')}</tbody>
+        </table>
+        <div class="info-box"><p><span class="label">Report to:</span> ${(report.cyber_analysis.recommended_report_to || []).join(' | ')}</p></div>
+      </div>` : `
+      <div class="section">
+        <div class="section-title">9. CYBER CRIME ANALYSIS</div>
+        <div class="info-box success"><p>Not applicable — this is not a cyber crime case.</p></div>
+      </div>`}
+
+      <!-- Overall AI Confidence -->
+      <hr/>
+      <div class="section">
+        <div class="info-box">
+          <p><span class="label">Overall AI Report Confidence:</span> <span class="badge badge-blue">${report.ai_confidence || 'Medium'}</span></p>
+          <p style="font-size:9px;color:#6b7280;margin-top:4px">This confidence level is determined by: number of similar cases found in database, strength of network connections, availability of financial trail data, and specificity of hotspot patterns. Higher confidence indicates more corroborating evidence from multiple analytical dimensions.</p>
+        </div>
+      </div>
     `
     exportToPdf({
-      title: `AI Investigation Report — ${report.fir_number}`,
+      title: 'AI Investigation Report',
       subtitle: `Generated: ${report.generated_at} | Confidence: ${report.ai_confidence}`,
       content,
-      filename: `PRAHARI_AI_Report_${report.fir_number?.replace(/[\/\s]/g, '_')}`,
+      filename: `PRAHARI_Investigation_Report_${report.fir_number?.replace(/[\/\s]/g, '_')}`,
+      firNumber: report.fir_number,
     })
   }
 
