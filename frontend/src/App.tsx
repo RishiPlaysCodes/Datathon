@@ -15,6 +15,9 @@ import { DeepfakePage } from '@/pages/DeepfakePage'
 import { PublicPortalPage } from '@/pages/PublicPortalPage'
 import { CCTVPage } from '@/pages/CCTVPage'
 import { CaseSimilarityPage } from '@/pages/CaseSimilarityPage'
+import { PolicyInsightsPage } from '@/pages/PolicyInsightsPage'
+import { PolicePortalPage } from '@/pages/PolicePortalPage'
+import { CrimeForecastPage } from '@/pages/CrimeForecastPage'
 
 const ROLE_LEVEL: Record<string, number> = {
   citizen: 0,
@@ -109,6 +112,18 @@ function App() {
           <Route
             path="case-similarity"
             element={<RoleRoute minimumRole="constable"><CaseSimilarityPage /></RoleRoute>}
+          />
+          <Route
+            path="complaints"
+            element={<RoleRoute minimumRole="constable"><PolicePortalPage /></RoleRoute>}
+          />
+          <Route
+            path="policy-insights"
+            element={<RoleRoute minimumRole="analyst"><PolicyInsightsPage /></RoleRoute>}
+          />
+          <Route
+            path="crime-forecast"
+            element={<RoleRoute minimumRole="constable"><CrimeForecastPage /></RoleRoute>}
           />
         </Route>
         <Route path="*" element={<DefaultRoute />} />

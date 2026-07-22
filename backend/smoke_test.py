@@ -663,7 +663,8 @@ class SmokeTest:
                     },
                 )
             )
-            self.require(data.get("complaint_number", "").startswith("PUB/"), "complaint number not generated")
+            self.require(data.get("complaint_number", "").startswith("PUB-"), "complaint number not generated")
+            self.require("/" not in data.get("complaint_number", ""), "complaint number must not contain a slash (breaks URL tracking)")
             self.require(data.get("ai_crime_type") == "fraud", f"AI misclassified complaint: {data.get('ai_crime_type')}")
             self.require(data.get("law_violated") is True, "AI failed to detect law violation")
             self.require(bool(data.get("ai_law_sections")), "no law sections returned")
@@ -766,6 +767,181 @@ class SmokeTest:
 
         self.check("CCTV suspect face matching", cctv_match)
 
+    def test_police_complaint_review(self) -> None:
+        """Police-side complaint inbox, status update, and FIR conversion."""
+        token = self.tokens.get("demo", {}).get("access_token", "")
+        context: Dict[str, Any] = {}
+
+        def register_fixture():
+            data = self.expect_json(
+                self.request(
+                    "POST",
+                    "public/complaint",
+                    json_body={
+                        "complainant_name": "Inbox Fixture Citizen",
+                        "complainant_phone": "9876543210",
+                        "complainant_email": "fixture@example.com",
+                        "description": "Someone hacked my online banking account and transferred money using a phishing link sent via SMS.",
+                        "location_name": "Indiranagar",
+                    },
+                )
+            )
+            context["complaint_number"] = data["complaint_number"]
+            return data
+
+        self.check("Fixture: register a complaint for inbox tests", register_fixture)
+
+        def inbox_shows_full_details():
+            self.require("complaint_number" in context, "complaint fixture unavailable")
+            data = self.expect_json(self.request("GET", "public/complaints/inbox", token=token))
+            self.require("pending_count" in data, "pending_count missing from inbox")
+            match = next((c for c in data["complaints"] if c["complaint_number"] == context["complaint_number"]), None)
+            self.require(match is not None, "newly filed complaint did not appear in police inbox")
+            self.require(match.get("complainant_phone") == "9876543210", "inbox is not showing full complainant details to police")
+            self.require(match.get("complainant_email") == "fixture@example.com", "inbox is missing complainant email")
+            context["complaint_id"] = match["id"]
+
+        self.check("Police inbox shows new complaints immediately with full details", inbox_shows_full_details)
+
+        def inbox_requires_auth():
+            response = self.request("GET", "public/complaints/inbox")
+            self.expect_status(response, [401, 403])
+
+        self.check("Police complaint inbox requires authentication", inbox_requires_auth)
+
+        def citizen_cannot_read_inbox():
+            citizen_token = self.tokens.get("citizen1", {}).get("access_token", "")
+            response = self.request("GET", "public/complaints/inbox", token=citizen_token)
+            self.expect_status(response, [403])
+
+        self.check("Citizen is blocked from police complaint inbox", citizen_cannot_read_inbox)
+
+        def update_status():
+            self.require("complaint_id" in context, "complaint id fixture unavailable")
+            data = self.expect_json(
+                self.request(
+                    "PATCH",
+                    f"public/complaints/{context['complaint_id']}/status",
+                    token=token,
+                    json_body={"status": "under_review"},
+                )
+            )
+            self.require(data.get("status") == "under_review", "status update did not apply")
+
+        self.check("Officer can update complaint status", update_status)
+
+        def convert_to_fir():
+            self.require("complaint_id" in context, "complaint id fixture unavailable")
+            data = self.expect_json(
+                self.request("POST", f"public/complaints/{context['complaint_id']}/convert-to-fir", token=token)
+            )
+            self.require(data.get("fir_number"), "FIR conversion did not return a FIR number")
+            context["converted_fir_id"] = data["fir_id"]
+
+        self.check("Officer can convert a complaint to a formal FIR", convert_to_fir)
+
+    def test_deepfake_no_false_positive(self) -> None:
+        """Regression: ordinary photos must NOT be flagged as deepfakes."""
+        token = self.tokens.get("demo", {}).get("access_token", "")
+
+        def genuine_photo_low_risk():
+            # A real-looking JPEG with camera EXIF and high-entropy pixel data.
+            import os
+            random_bytes = os.urandom(20000)
+            jpeg = (
+                b"\xff\xd8\xff\xe1\x00\x30Exif\x00\x00Make Samsung Model Galaxy ISO 200 "
+                + b"\xff\xc0\x00\x11\x08" + (1200).to_bytes(2, "big") + (1600).to_bytes(2, "big")
+                + b"\x03\x01\x22\x00"
+                + random_bytes
+                + b"\xff\xd9"
+            )
+            data = self.expect_json(self.upload("demo", "genuine_photo.jpg", jpeg, "image/jpeg"))
+            self.require(data.get("is_deepfake") is False, "genuine camera photo was falsely flagged as a deepfake")
+            self.require(data.get("confidence", 1) < 0.6, f"genuine photo confidence too high: {data.get('confidence')}")
+            self.require(data.get("risk_level") in ("low", "medium"), f"genuine photo risk_level too high: {data.get('risk_level')}")
+
+        self.check("Deepfake: genuine EXIF photo is NOT falsely flagged", genuine_photo_low_risk)
+
+        def whatsapp_style_photo_low_risk():
+            # WhatsApp/Telegram strip EXIF from every photo they forward — this
+            # alone must never push a real photo into high/critical risk.
+            import os
+            random_bytes = os.urandom(20000)
+            jpeg_no_exif = (
+                b"\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00"
+                + b"\xff\xc0\x00\x11\x08" + (1024).to_bytes(2, "big") + (1024).to_bytes(2, "big")
+                + b"\x03\x01\x22\x00"
+                + random_bytes
+                + b"\xff\xd9"
+            )
+            data = self.expect_json(self.upload("demo", "whatsapp_forward.jpg", jpeg_no_exif, "image/jpeg"))
+            self.require(data.get("is_deepfake") is False, "EXIF-stripped (WhatsApp-style) photo was falsely flagged")
+            self.require(data.get("confidence", 1) < 0.6, f"WhatsApp-style photo confidence too high: {data.get('confidence')}")
+
+        self.check("Deepfake: EXIF-stripped forwarded photo is NOT falsely flagged", whatsapp_style_photo_low_risk)
+
+    def test_policy_and_predictive_features(self) -> None:
+        """Policy insights, offender profiling, and crime forecast (RFP features)."""
+        analyst_token = self.tokens.get("analyst", {}).get("access_token", "")
+        demo_token = self.tokens.get("demo", {}).get("access_token", "")
+
+        def policy_insights():
+            data = self.expect_json(self.request("GET", "public/policy-insights", token=analyst_token, query={"days": 365}))
+            self.require("victim_demographics" in data, "victim_demographics missing")
+            self.require("offender_demographics" in data, "offender_demographics missing")
+            self.require("district_crime_rates" in data, "district_crime_rates missing")
+            self.require("data_limitations" in data, "data_limitations disclosure missing (must not fabricate socio-economic data)")
+            self.require(isinstance(data.get("policy_recommendations"), list), "policy_recommendations must be a list")
+
+        self.check("Policy insights endpoint (analyst+)", policy_insights)
+
+        def policy_insights_denied_for_constable():
+            constable_token = self.tokens.get("constable", {}).get("access_token", "")
+            response = self.request("GET", "public/policy-insights", token=constable_token)
+            self.expect_status(response, [403])
+
+        self.check("Policy insights blocked below analyst role", policy_insights_denied_for_constable)
+
+        def offender_profiling():
+            # FIR id 1 always exists; result depends on data but must be well-formed either way.
+            data = self.expect_json(self.request("GET", "public/offender-profile/1", token=demo_token))
+            self.require("already_identified" in data, "already_identified field missing")
+            if data["already_identified"]:
+                self.require("identified_accused" in data, "identified_accused missing when already identified")
+            elif data.get("sufficient_data"):
+                self.require("inferred_profile" in data, "inferred_profile missing")
+                self.require("confidence" in data, "confidence missing")
+                self.require("next_steps" in data, "next_steps missing")
+            else:
+                self.require("message" in data, "explanatory message missing when data is insufficient")
+
+        self.check("Unidentified offender profiling endpoint", offender_profiling)
+
+        def offender_profiling_not_found():
+            response = self.request("GET", "public/offender-profile/999999", token=demo_token)
+            self.expect_status(response, [404])
+
+        self.check("Offender profiling 404s for a non-existent FIR", offender_profiling_not_found)
+
+        def crime_forecast():
+            data = self.expect_json(
+                self.request("GET", "public/crime-forecast", token=demo_token, query={"district": "Bengaluru Urban", "days": 365})
+            )
+            self.require("sufficient_data" in data, "sufficient_data field missing")
+            if data["sufficient_data"]:
+                self.require("risk_level" in data, "risk_level missing")
+                self.require("preventive_measures" in data and data["preventive_measures"], "preventive_measures missing")
+                self.require("method_disclosure" in data, "method_disclosure missing (must not claim to be an ML model)")
+                self.require("forecast_summary" in data, "forecast_summary missing")
+
+        self.check("Predictive crime forecast endpoint", crime_forecast)
+
+        def crime_forecast_requires_location_or_district():
+            response = self.request("GET", "public/crime-forecast", token=demo_token)
+            self.expect_status(response, [400])
+
+        self.check("Crime forecast requires a location or district", crime_forecast_requires_location_or_district)
+
     def run(self) -> int:
         print(f"PRAHARI smoke test\nBackend:  {self.base_url}")
         if self.frontend_url:
@@ -777,6 +953,9 @@ class SmokeTest:
         accused_id, police_fir_ids = self.test_police_features()
         self.test_citizen_boundaries(accused_id, police_fir_ids)
         self.test_public_portal()
+        self.test_police_complaint_review()
+        self.test_deepfake_no_false_positive()
+        self.test_policy_and_predictive_features()
         print("-" * 72)
         print(f"RESULT: {self.passed} passed, {self.failed} failed")
         if self.failed:

@@ -2,7 +2,7 @@ import { NavLink } from 'react-router-dom'
 import {
   MessageSquare, LayoutDashboard, Network, Map, Users,
   Shield, FileText, TrendingUp, LogOut, Activity, ScanSearch,
-  Camera, GitCompare
+  Camera, GitCompare, Inbox, Landmark, TrendingUp as TrendingUpIcon
 } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 
@@ -10,13 +10,16 @@ const allNavItems = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', minRole: 'constable' },
   { to: '/chat', icon: MessageSquare, label: 'AI Chat', minRole: 'constable' },
   { to: '/firs', icon: FileText, label: 'FIR Records', minRole: 'citizen' },
+  { to: '/complaints', icon: Inbox, label: 'Public Complaints', minRole: 'constable' },
   { to: '/deepfake', icon: ScanSearch, label: 'Deepfake Detect', minRole: 'citizen' },
   { to: '/cctv', icon: Camera, label: 'CCTV Match', minRole: 'constable' },
-  { to: '/case-similarity', icon: GitCompare, label: 'Case Similarity', minRole: 'constable' },
+  { to: '/case-similarity', icon: GitCompare, label: 'Investigation Support', minRole: 'constable' },
   { to: '/network', icon: Network, label: 'Network Graph', minRole: 'constable' },
   { to: '/hotspots', icon: Map, label: 'Hotspot Map', minRole: 'constable' },
+  { to: '/crime-forecast', icon: TrendingUpIcon, label: 'Crime Forecast', minRole: 'constable' },
   { to: '/accused', icon: Users, label: 'Accused', minRole: 'constable' },
   { to: '/analytics', icon: TrendingUp, label: 'Analytics', minRole: 'constable' },
+  { to: '/policy-insights', icon: Landmark, label: 'Policy Insights', minRole: 'analyst' },
   { to: '/audit', icon: Shield, label: 'Audit Logs', minRole: 'supervisor' },
 ]
 

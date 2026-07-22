@@ -230,7 +230,21 @@ def _pixel_level_analysis(data: bytes, fmt: str) -> list:
 
 
 def _analyze_media(filename: str, file_bytes: bytes) -> dict:
-    """Real, deterministic, explainable manipulation analysis of the raw bytes."""
+    """Real, deterministic, explainable manipulation analysis of the raw bytes.
+
+    Signals are split into two tiers so ordinary phone/WhatsApp photos never
+    falsely hit a high score:
+
+    - STRONG evidence (named AI tool, editor signature, provenance manifest):
+      these are near-certain proof of manipulation/generation on their own,
+      so they drive the score directly.
+    - WEAK/circumstantial evidence (missing EXIF, "round" dimensions, low
+      entropy, byte periodicity): these are common in ANY re-compressed or
+      messaging-app-processed photo (WhatsApp/Instagram/Telegram strip EXIF
+      from every photo they forward). They are capped at a low ceiling and
+      can only ever nudge a "medium" verdict — they can never alone produce
+      "high"/"critical", and never reach 100%.
+    """
     ext = os.path.splitext(filename)[1].lower()
     is_video = ext in VIDEO_EXTENSIONS
     fmt, width, height = _detect_format_and_dimensions(file_bytes)
@@ -242,77 +256,89 @@ def _analyze_media(filename: str, file_bytes: bytes) -> dict:
     has_exif = (b"Exif\x00\x00" in file_bytes[:200_000]) or any(h in text for h in CAMERA_HINTS)
     c2pa_present = any(tag in text for tag in ("c2pa", "content credentials", "contentauthenticity", "jumbf"))
 
-    score = 0.0
+    strong_score = 0.0   # hard evidence: named tool/editor/provenance signature
+    weak_score = 0.0     # circumstantial signals only
     factors = []
 
     if ai_hits:
-        score += 0.65
+        strong_score += 0.70
         factors.append({
             "signal": "AI-generation metadata",
             "detail": ", ".join(ai_hits[:4]),
             "impact": "high",
         })
+    if editor_hits:
+        strong_score += 0.55
+        factors.append({
+            "signal": "Image-editor signature",
+            "detail": ", ".join(editor_hits[:4]),
+            "impact": "high",
+        })
     if c2pa_present and not ai_hits:
-        score += 0.30
+        strong_score += 0.35
         factors.append({
             "signal": "Content-provenance (C2PA) manifest",
             "detail": "AI/edit provenance markers embedded",
             "impact": "medium",
         })
-    if editor_hits:
-        score += 0.38
-        factors.append({
-            "signal": "Image-editor signature",
-            "detail": ", ".join(editor_hits[:4]),
-            "impact": "medium",
-        })
+
+    # --- Weak/circumstantial signals (heavily capped — see docstring) ---
     if not has_exif and fmt in ("png", "webp"):
-        score += 0.18
+        weak_score += 0.10
         factors.append({
             "signal": "No camera EXIF metadata",
-            "detail": f"{fmt.upper()} without capture metadata (common for generated/edited media)",
+            "detail": f"{fmt.upper()} without capture metadata — common for screenshots, "
+                      f"messaging-app re-saves, and generated/edited media alike; weak signal on its own",
             "impact": "low",
         })
     if width and height:
         if width == height and width in GENERATIVE_CANVAS:
-            score += 0.16
+            weak_score += 0.10
             factors.append({
                 "signal": "Generative canvas size",
-                "detail": f"{width}x{height} square, typical of diffusion/GAN outputs",
+                "detail": f"{width}x{height} square — seen in diffusion/GAN outputs, but also thumbnails/avatars",
                 "impact": "low",
             })
         elif width in GENERATIVE_CANVAS and height in GENERATIVE_CANVAS:
-            score += 0.08
+            weak_score += 0.06
             factors.append({
                 "signal": "Model-preset dimensions",
-                "detail": f"{width}x{height} matches common generation presets",
+                "detail": f"{width}x{height} matches common generation presets (also common resize targets)",
                 "impact": "low",
             })
     if fmt in ("png", "jpeg", "webp") and 0 < entropy < 6.0:
-        score += 0.08
+        weak_score += 0.06
         factors.append({
             "signal": "Low byte entropy",
-            "detail": f"entropy {entropy}/8 is unusually smooth for a real photo",
+            "detail": f"entropy {entropy}/8 is smoother than a typical noisy photo",
             "impact": "low",
         })
 
-    # Positive authenticity signal: genuine camera metadata reduces suspicion.
-    if has_exif and not ai_hits and not editor_hits:
-        score = max(0.0, score - 0.15)
-        factors.append({
-            "signal": "Genuine camera EXIF present",
-            "detail": "capture metadata consistent with an authentic photo",
-            "impact": "reassuring",
-        })
-
-    # ─── Pixel-level statistical analysis (beyond metadata) ───
+    # Pixel-level statistical analysis — also weak/circumstantial.
     pixel_signals = _pixel_level_analysis(file_bytes, fmt)
     for signal in pixel_signals:
-        score += signal["score_add"]
+        weak_score += signal["score_add"] * 0.5  # halve: these are the least reliable signals
         factors.append({
             "signal": signal["name"],
             "detail": signal["detail"],
-            "impact": signal["impact"],
+            "impact": "low",
+        })
+
+    # Cap the ENTIRE weak-evidence contribution: circumstantial signals alone
+    # can never push a genuine photo past "medium" risk. Real evidence (strong
+    # signals) is required to reach "high"/"critical".
+    weak_score = min(weak_score, 0.45)
+
+    score = strong_score + weak_score
+
+    # Positive authenticity signal: genuine camera metadata is real evidence
+    # of an authentic capture pipeline and meaningfully reduces suspicion.
+    if has_exif and not ai_hits and not editor_hits:
+        score = max(0.0, score - 0.25)
+        factors.append({
+            "signal": "Genuine camera EXIF present",
+            "detail": "capture metadata (make/model/exposure) consistent with an authentic photo",
+            "impact": "reassuring",
         })
 
     if not factors:
@@ -323,13 +349,18 @@ def _analyze_media(filename: str, file_bytes: bytes) -> dict:
         })
 
     score = max(0.0, min(1.0, score))
-    is_deepfake = score >= 0.6
+    # Require at least some strong evidence to call it a deepfake outright —
+    # weak signals alone (common to any re-compressed photo) never suffice.
+    is_deepfake = strong_score >= 0.35 and score >= 0.6
 
-    if score >= 0.85:
+    # Risk tier also requires strong evidence to reach high/critical — a photo
+    # with only circumstantial signals (no EXIF, round dimensions, etc.) caps
+    # at "medium" at most, no matter how many weak signals stack up.
+    if strong_score >= 0.35 and score >= 0.85:
         risk_level = "critical"
-    elif score >= 0.6:
+    elif strong_score >= 0.35 and score >= 0.6:
         risk_level = "high"
-    elif score >= 0.35:
+    elif score >= 0.25:
         risk_level = "medium"
     else:
         risk_level = "low"
@@ -343,6 +374,8 @@ def _analyze_media(filename: str, file_bytes: bytes) -> dict:
         "editor_signatures": ", ".join(editor_hits) if editor_hits else "none",
         "c2pa_provenance": "detected" if c2pa_present else "none",
         "signals_evaluated": len(factors),
+        "hard_evidence_score": round(strong_score, 3),
+        "circumstantial_score": round(weak_score, 3),
         "analysis_method": "Byte-level metadata & structural forensics (advisory heuristic)",
     }
 

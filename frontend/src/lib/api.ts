@@ -173,4 +173,63 @@ export const deepfakeAPI = {
   },
 }
 
+// Police-side public complaint review (authenticated) + policy insights
+export const publicPoliceAPI = {
+  getInbox: async (params?: Record<string, any>) => {
+    const { data } = await api.get('/public/complaints/inbox', { params })
+    return data as {
+      total: number
+      pending_count: number
+      complaints: Array<{
+        id: number
+        complaint_number: string
+        complainant_name: string
+        complainant_phone: string | null
+        complainant_email: string | null
+        description: string
+        ai_crime_type: string
+        ai_law_sections: string[]
+        ai_severity: string
+        ai_confidence: number
+        law_violated: boolean
+        status: string
+        location_name: string | null
+        district: string | null
+        submitted_at: string
+        resolved_at: string | null
+        will_go_public_at: string | null
+      }>
+    }
+  },
+  updateStatus: async (id: number, status: string, resolution_note?: string) => {
+    const { data } = await api.patch(`/public/complaints/${id}/status`, { status, resolution_note })
+    return data
+  },
+  convertToFir: async (id: number) => {
+    const { data } = await api.post(`/public/complaints/${id}/convert-to-fir`)
+    return data as { fir_id: number; fir_number: string; complaint_number: string }
+  },
+}
+
+export const policyAPI = {
+  getInsights: async (days = 365) => {
+    const { data } = await api.get('/public/policy-insights', { params: { days } })
+    return data
+  },
+}
+
+export const offenderProfileAPI = {
+  profile: async (firId: number) => {
+    const { data } = await api.get(`/public/offender-profile/${firId}`)
+    return data
+  },
+}
+
+export const forecastAPI = {
+  get: async (params: { location?: string; district?: string; days?: number }) => {
+    const { data } = await api.get('/public/crime-forecast', { params })
+    return data
+  },
+}
+
 export default api
