@@ -24,7 +24,17 @@ class Settings(BaseSettings):
 
     # Server
     HOST: str = "0.0.0.0"
-    PORT: int = 8001
+    PORT: int = int(
+        os.environ.get(
+            "X_ZOHO_CATALYST_LISTEN_PORT",
+            os.environ.get("PORT", "8001"),
+        )
+    )
+
+    @property
+    def listen_port(self) -> int:
+        """Return the port actually selected by the AppSail startup command."""
+        return int(os.environ.get("X_ZOHO_CATALYST_LISTEN_PORT", self.PORT))
 
     # Database - defaults to SQLite in a writable temp dir (Catalyst-safe)
     DATABASE_URL: str = os.environ.get(
@@ -47,6 +57,7 @@ class Settings(BaseSettings):
 
     # CORS
     CORS_ORIGINS: List[str] = [
+        "https://prahari-60079422859.development.catalystserverless.in",
         "http://localhost:5174",
         "http://127.0.0.1:5174",
         "http://frontend:5174",
