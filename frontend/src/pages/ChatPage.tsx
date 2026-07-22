@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
-import { Send, Bot, User, Sparkles, Info, Mic, MicOff, Volume2, VolumeX } from 'lucide-react'
+import { Send, Bot, User, Sparkles, Info, Mic, MicOff, Volume2, VolumeX, Download } from 'lucide-react'
 import { aiAPI } from '@/lib/api'
+import { exportToPdf } from '@/lib/pdfExport'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import type { ChatMessage } from '@/types'
 import ReactMarkdown from 'react-markdown'
@@ -185,6 +186,23 @@ export function ChatPage() {
               }`}
             >
               {voiceReplies ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+            </button>
+          )}
+          {messages.length > 1 && (
+            <button
+              onClick={() => {
+                const chatHtml = messages.map(m => (
+                  `<div style="margin-bottom:12px;padding:8px;border-left:3px solid ${m.role==='user'?'#3b82f6':'#10b981'}">
+                    <p style="font-size:10px;color:#666;margin-bottom:4px">${m.role === 'user' ? 'You' : 'PRAHARI AI'}${m.intent ? ` | Intent: ${m.intent} (${((m.confidence||0)*100).toFixed(0)}%)` : ''}</p>
+                    <p style="font-size:12px">${m.content.replace(/\n/g, '<br/>')}</p>
+                  </div>`
+                )).join('')
+                exportToPdf({ title: 'AI Chat Conversation', subtitle: `Session: ${sessionId || 'N/A'} | ${messages.length} messages`, content: chatHtml })
+              }}
+              title="Download chat as PDF"
+              className="p-2 rounded-lg border border-dark-700 text-gray-500 hover:text-gray-300 transition-colors"
+            >
+              <Download className="w-4 h-4" />
             </button>
           )}
           {sessionId && (
