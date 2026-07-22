@@ -57,7 +57,7 @@ export function CaseSimilarityPage() {
 
       {/* Search */}
       <div className="glass-card p-4 flex gap-3 items-center">
-        <input className="input-field flex-1" type="number" min="1" placeholder="Enter FIR ID (e.g. 1, 5, 10...)" value={firId} onChange={e => setFirId(e.target.value)} onKeyDown={e => e.key === 'Enter' && search()} />
+        <input className="input-field flex-1" type="text" placeholder="Enter FIR ID (e.g. 1, 5, 10) or complaint number (PUB-20260722-ABC)" value={firId} onChange={e => setFirId(e.target.value)} onKeyDown={e => e.key === 'Enter' && search()} />
         <button onClick={search} disabled={loading} className="btn-primary px-6 disabled:opacity-40">
           {loading ? 'Analyzing...' : <><Search className="w-4 h-4 mr-1 inline" />{tab === 'similarity' ? 'Find Similar' : 'Build Profile'}</>}
         </button>

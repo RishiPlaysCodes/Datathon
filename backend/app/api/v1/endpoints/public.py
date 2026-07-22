@@ -195,6 +195,9 @@ class PublicComplaintResponse(BaseModel):
     law_violated: bool
     advisory: str
     message: str
+    assigned_station: str
+    tracking_number: str
+    helpline: str
 
 
 @router.post("/complaint", response_model=PublicComplaintResponse)
@@ -234,6 +237,26 @@ async def register_public_complaint(
     db.add(record)
     await db.commit()
 
+    # Assign nearest police station based on district/location
+    station_assignments = {
+        "koramangala": "Koramangala Police Station (080-25530566)",
+        "indiranagar": "Indiranagar Police Station (080-25285888)",
+        "whitefield": "Whitefield Police Station (080-28452100)",
+        "electronic city": "Electronic City Police Station (080-28520530)",
+        "hsr layout": "HSR Layout Police Station (080-25722222)",
+        "btm layout": "BTM Layout Police Station (080-26781234)",
+        "jayanagar": "Jayanagar Police Station (080-26633111)",
+        "marathahalli": "Marathahalli Police Station (080-28524900)",
+        "yelahanka": "Yelahanka Police Station (080-28460000)",
+        "hebbal": "Hebbal Police Station (080-23620100)",
+    }
+    location_lower = (complaint.location_name or "").lower()
+    assigned_station = "Bengaluru Cyber Crime Cell (080-22942475)"
+    for loc, station in station_assignments.items():
+        if loc in location_lower:
+            assigned_station = station
+            break
+
     return PublicComplaintResponse(
         complaint_number=complaint_number,
         status="pending",
@@ -243,8 +266,12 @@ async def register_public_complaint(
         ai_confidence=classification["confidence"],
         law_violated=classification["law_violated"],
         advisory=classification["advisory"],
-        message="Your complaint has been registered. Police will review within 7 days. "
-                "If unresolved, it will become publicly visible (without personal details).",
+        assigned_station=assigned_station,
+        tracking_number=complaint_number,
+        helpline="Karnataka Police Helpline: 100 | Cyber Crime: 1930 | Women: 181",
+        message=f"Your complaint has been registered and assigned to {assigned_station}. "
+                f"Track status using your tracking number: {complaint_number}. "
+                f"Police will review within 7 days. If unresolved, it becomes publicly visible.",
     )
 
 
@@ -420,12 +447,12 @@ async def convert_complaint_to_fir(
         raise HTTPException(status_code=404, detail="Complaint not found")
 
     law_sections = json.loads(complaint.ai_law_sections) if complaint.ai_law_sections else []
-    fir_number = f"KSP/PUB/{datetime.now().strftime('%Y')}/{complaint.id:04d}"
+    fir_number = f"KSP-PUB-{datetime.now().strftime('%Y')}-{uuid.uuid4().hex[:6].upper()}"
 
     fir = FIR(
         fir_number=fir_number,
         station_id="PUB-INTAKE",
-        station_name="Public Portal Intake",
+        station_name="Public Portal Intake — Bengaluru Cyber Cell",
         district=complaint.district or "Bengaluru Urban",
         crime_type=complaint.ai_crime_type or "general complaint",
         description=complaint.description,
@@ -436,6 +463,8 @@ async def convert_complaint_to_fir(
         severity=complaint.ai_severity or "medium",
         ipc_section="; ".join(law_sections) if law_sections else None,
         complainant_name=complaint.complainant_name,
+        complainant_phone=complaint.complainant_phone,
+        complainant_email=complaint.complainant_email,
     )
     db.add(fir)
     complaint.status = "under_review"
