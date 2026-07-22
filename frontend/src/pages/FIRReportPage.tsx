@@ -41,7 +41,28 @@ export function FIRReportPage() {
       <div class="section"><div class="section-title">2. Crime Classification</div>
         ${objectToTable(report.crime_classification)}
       </div>
-      <div class="section"><div class="section-title">6. Recommended Actions</div>
+      <div class="section"><div class="section-title">3. Similar Cases (${report.similar_cases?.length || 0} found)</div>
+        <table><thead><tr><th>FIR #</th><th>Crime</th><th>Location</th><th>Status</th><th>Score</th></tr></thead><tbody>
+        ${(report.similar_cases || []).map((c: any) => `<tr><td>${c.fir_number}</td><td>${c.crime_type}</td><td>${c.location || '-'}</td><td>${c.status}</td><td>${c.similarity_score}%</td></tr>`).join('')}
+        </tbody></table>
+      </div>
+      <div class="section"><div class="section-title">4. Criminal Network Analysis</div>
+        ${report.network_analysis?.linked_accused?.length
+          ? `<table><thead><tr><th>Name</th><th>Risk Score</th><th>Cases</th><th>Repeat?</th><th>Gang</th></tr></thead><tbody>
+             ${report.network_analysis.linked_accused.map((a: any) => `<tr><td>${a.name}</td><td>${a.risk_score?.toFixed(0)}/100</td><td>${a.total_cases}</td><td>${a.is_repeat_offender ? 'Yes' : 'No'}</td><td>${a.gang_id || '-'}</td></tr>`).join('')}
+             </tbody></table>
+             <p>Network size: ${report.network_analysis.total_network_size} connections</p>`
+          : '<p>No linked accused in database.</p>'}
+      </div>
+      <div class="section"><div class="section-title">5. Hotspot Analysis</div>
+        ${objectToTable({
+          Location: report.hotspot_analysis?.location,
+          Density: report.hotspot_analysis?.density,
+          'Cases (90 days)': report.hotspot_analysis?.cases_in_90_days,
+          'Peak Time': report.hotspot_analysis?.peak_time_window,
+        })}
+      </div>
+      <div class="section"><div class="section-title">6. Recommended Investigation Actions</div>
         <table><thead><tr><th>Priority</th><th>Action</th><th>Category</th></tr></thead><tbody>
         ${(report.recommended_actions || []).map((a: any) => `<tr><td>P${a.priority}</td><td>${a.action}</td><td>${a.category}</td></tr>`).join('')}
         </tbody></table>
@@ -49,8 +70,29 @@ export function FIRReportPage() {
       <div class="section"><div class="section-title">7. Prevention Measures</div>
         <ul>${(report.prevention_measures || []).map((m: string) => `<li>${m}</li>`).join('')}</ul>
       </div>
+      ${report.financial_trail?.applicable ? `
+      <div class="section"><div class="section-title">8. Financial Trail</div>
+        ${objectToTable({
+          'Loss Amount': report.financial_trail.loss_amount ? '₹' + report.financial_trail.loss_amount : 'N/A',
+          'Loss Type': report.financial_trail.loss_type || 'N/A',
+          'Transaction ID': report.financial_trail.transaction_id || 'N/A',
+          'Risk Flag': report.financial_trail.risk_flag || 'None',
+        })}
+      </div>` : ''}
+      ${report.cyber_analysis?.applicable ? `
+      <div class="section"><div class="section-title">9. Cyber Crime Analysis</div>
+        <table><thead><tr><th>Attack Vector</th><th>Recommendation</th></tr></thead><tbody>
+        ${(report.cyber_analysis.attack_vectors || []).map((v: any) => `<tr><td>${v.type}</td><td>${v.recommendation}</td></tr>`).join('')}
+        </tbody></table>
+        <p>Report to: ${(report.cyber_analysis.recommended_report_to || []).join(', ')}</p>
+      </div>` : ''}
     `
-    exportToPdf({ title: `AI Investigation Report — ${report.fir_number}`, subtitle: `Generated: ${report.generated_at}`, content })
+    exportToPdf({
+      title: `AI Investigation Report — ${report.fir_number}`,
+      subtitle: `Generated: ${report.generated_at} | Confidence: ${report.ai_confidence}`,
+      content,
+      filename: `PRAHARI_AI_Report_${report.fir_number?.replace(/[\/\s]/g, '_')}`,
+    })
   }
 
   return (
