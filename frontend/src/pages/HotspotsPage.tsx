@@ -8,7 +8,7 @@ import { Map, Filter, AlertTriangle } from 'lucide-react'
 
 export function HotspotsPage() {
   const [crimeType, setCrimeType] = useState('')
-  const [days, setDays] = useState(90)
+  const [days, setDays] = useState(365)
   const mapRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<L.Map | null>(null)
 
