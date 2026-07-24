@@ -516,6 +516,13 @@ async def _handle_help_query(db: AsyncSession):
     return response, data, ["PRAHARI Capability Guide"]
 
 
+@router.get("/gemini-status")
+async def gemini_status(current_user: User = Depends(require_role("constable"))):
+    """Diagnostic: check if Gemini API key is configured and working."""
+    from app.services.gemini import gemini_diagnostic
+    return await gemini_diagnostic()
+
+
 @router.get("/chat/history/{session_id}")
 async def get_chat_history(
     session_id: str,

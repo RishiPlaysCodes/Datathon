@@ -4,6 +4,7 @@ Used when the deterministic NLU cannot map a user query to a specific
 crime-intelligence intent. Routes general questions (about Indian law,
 investigation procedures, criminology concepts) to Google Gemini.
 """
+import os
 import httpx
 import logging
 from app.core.config import settings
@@ -18,46 +19,102 @@ GEMINI_SYSTEM_PROMPT = (
     "If unsure, say so honestly. Never fabricate law sections or case numbers."
 )
 
+# Try these models in order — the first that works is used.
+GEMINI_MODELS = [
+    "gemini-2.0-flash",
+    "gemini-2.0-flash-001",
+    "gemini-1.5-flash",
+    "gemini-1.5-flash-latest",
+    "gemini-flash-latest",
+]
+
+
+def _get_api_key() -> str:
+    return os.environ.get("GEMINI_API_KEY", "") or settings.GEMINI_API_KEY
+
 
 async def ask_gemini(user_query: str, context: str = "") -> str | None:
-    """Call Gemini 2.0 Flash and return the response text, or None on failure."""
-    import os
-    api_key = os.environ.get("GEMINI_API_KEY", "") or settings.GEMINI_API_KEY
+    """Call Gemini and return the response text, or None on failure.
+
+    Tries multiple model names and uses the x-goog-api-key header (works with
+    both classic AIzaSy... keys and newer AQ.* keys from AI Studio).
+    """
+    api_key = _get_api_key()
     if not api_key:
-        logger.info("GEMINI_API_KEY not configured — skipping Gemini call")
+        logger.warning("GEMINI: no API key configured — using deterministic fallback")
         return None
 
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
-
+    prompt = f"{GEMINI_SYSTEM_PROMPT}\n\nContext: {context}\n\nUser: {user_query}"
     payload = {
-        "contents": [
-            {
-                "role": "user",
-                "parts": [{"text": f"{GEMINI_SYSTEM_PROMPT}\n\nContext: {context}\n\nUser: {user_query}"}],
-            }
-        ],
-        "generationConfig": {
-            "temperature": 0.3,
-            "maxOutputTokens": 1024,
-        },
+        "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+        "generationConfig": {"temperature": 0.3, "maxOutputTokens": 1024},
     }
+    headers = {"x-goog-api-key": api_key, "Content-Type": "application/json"}
 
+    last_error = ""
     try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
-            resp = await client.post(url, json=payload)
-            if resp.status_code != 200:
-                logger.warning(f"Gemini returned {resp.status_code}: {resp.text[:200]}")
-                return None
-            data = resp.json()
-            candidates = data.get("candidates", [])
-            if candidates:
-                parts = candidates[0].get("content", {}).get("parts", [])
-                if parts:
-                    return parts[0].get("text", "").strip()
-            logger.warning(f"Gemini returned no candidates: {data}")
-    except httpx.TimeoutException:
-        logger.warning("Gemini request timed out (15s)")
-    except Exception as e:
-        logger.error(f"Gemini error: {e}")
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            for model in GEMINI_MODELS:
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+                try:
+                    resp = await client.post(url, json=payload, headers=headers)
+                except Exception as e:
+                    last_error = f"{model}: request failed ({e})"
+                    continue
 
+                if resp.status_code == 200:
+                    data = resp.json()
+                    candidates = data.get("candidates", [])
+                    if candidates:
+                        parts = candidates[0].get("content", {}).get("parts", [])
+                        if parts and parts[0].get("text"):
+                            logger.info(f"GEMINI: answered using model {model}")
+                            return parts[0]["text"].strip()
+                    last_error = f"{model}: 200 but no text ({str(data)[:150]})"
+                    continue
+
+                # 404 = model not available for this key → try next model.
+                # 400/403 = key/auth problem → stop, no point trying others.
+                last_error = f"{model}: HTTP {resp.status_code} — {resp.text[:200]}"
+                if resp.status_code in (400, 401, 403):
+                    break
+    except Exception as e:
+        last_error = f"client error: {e}"
+
+    logger.warning(f"GEMINI FAILED: {last_error}")
     return None
+
+
+async def gemini_diagnostic() -> dict:
+    """Return a diagnostic dict describing whether Gemini is working.
+
+    Exposed via /api/v1/ai/gemini-status so you can verify the key + model
+    without reading server logs.
+    """
+    api_key = _get_api_key()
+    if not api_key:
+        return {"configured": False, "working": False, "detail": "No GEMINI_API_KEY set"}
+
+    payload = {"contents": [{"role": "user", "parts": [{"text": "Say OK"}]}]}
+    headers = {"x-goog-api-key": api_key, "Content-Type": "application/json"}
+    results = []
+    try:
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            for model in GEMINI_MODELS:
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+                try:
+                    resp = await client.post(url, json=payload, headers=headers)
+                    results.append({"model": model, "status": resp.status_code, "body": resp.text[:150]})
+                    if resp.status_code == 200:
+                        return {
+                            "configured": True,
+                            "working": True,
+                            "model": model,
+                            "key_prefix": api_key[:6] + "...",
+                        }
+                except Exception as e:
+                    results.append({"model": model, "error": str(e)})
+    except Exception as e:
+        return {"configured": True, "working": False, "detail": str(e)}
+
+    return {"configured": True, "working": False, "key_prefix": api_key[:6] + "...", "attempts": results}
