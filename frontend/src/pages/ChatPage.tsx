@@ -325,13 +325,9 @@ function MessageBubble({
           </div>
         )}
 
-        {/* Confidence */}
+        {/* Confidence + Explain This */}
         {message.intent && (
-          <div className="flex items-center gap-2 text-[10px] text-gray-600">
-            <span>Intent: {message.intent}</span>
-            <span>|</span>
-            <span>Confidence: {((message.confidence || 0) * 100).toFixed(0)}%</span>
-          </div>
+          <ExplainPanel message={message} />
         )}
 
         {/* Suggestions */}
@@ -349,6 +345,40 @@ function MessageBubble({
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+
+function ExplainPanel({ message }: { message: ChatMessage }) {
+  const [expanded, setExpanded] = useState(false)
+  const confidence = message.confidence || 0
+  const confidenceLevel = confidence >= 0.8 ? 'HIGH' : confidence >= 0.5 ? 'MEDIUM' : 'LOW'
+  const confidenceColor = confidence >= 0.8 ? 'text-green-400' : confidence >= 0.5 ? 'text-yellow-400' : 'text-red-400'
+
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center gap-2 text-[10px] text-gray-600">
+        <span>Intent: {message.intent}</span>
+        <span>|</span>
+        <span className={confidenceColor}>Confidence: {(confidence * 100).toFixed(0)}% ({confidenceLevel})</span>
+        <button onClick={() => setExpanded(!expanded)} className="ml-2 text-cyan-500 hover:text-cyan-400 underline">
+          {expanded ? 'Hide' : '🔍 Explain This'}
+        </button>
+      </div>
+      {expanded && (
+        <div className="bg-gray-900/80 border border-cyan-900/50 rounded-lg p-3 text-[11px] space-y-1.5">
+          <p className="text-cyan-400 font-medium">Evidence Trail:</p>
+          <p className="text-gray-400">• Method: Deterministic keyword-based NLU (zero hallucination)</p>
+          <p className="text-gray-400">• Classified Intent: <span className="text-white">{message.intent}</span></p>
+          <p className="text-gray-400">• Confidence: <span className={confidenceColor}>{(confidence * 100).toFixed(0)}% — {confidenceLevel}</span></p>
+          <p className="text-gray-400">• Confidence Reason: {confidence >= 0.8 ? 'Multiple keyword matches confirmed intent' : confidence >= 0.5 ? '1-2 keyword matches — moderate certainty' : 'Weak signal — manual verification recommended'}</p>
+          {message.sources && message.sources.length > 0 && (
+            <p className="text-gray-400">• Data Sources: {message.sources.join(', ')}</p>
+          )}
+          <p className="text-gray-500 italic mt-1">Same input always produces same output. No external LLM used for crime queries.</p>
+        </div>
+      )}
     </div>
   )
 }

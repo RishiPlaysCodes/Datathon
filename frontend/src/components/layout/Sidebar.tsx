@@ -2,7 +2,8 @@ import { NavLink } from 'react-router-dom'
 import {
   MessageSquare, LayoutDashboard, Network, Map, Users,
   Shield, FileText, TrendingUp, LogOut, Activity, ScanSearch,
-  Camera, GitCompare, Inbox, Landmark, TrendingUp as TrendingUpIcon, FileSearch
+  Camera, GitCompare, Inbox, Landmark, TrendingUp as TrendingUpIcon, FileSearch,
+  Clock, CheckSquare, FolderOpen, StickyNote
 } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 
@@ -12,9 +13,13 @@ const allNavItems = [
   { to: '/firs', icon: FileText, label: 'FIR Records', minRole: 'citizen' },
   { to: '/fir-report', icon: FileSearch, label: 'AI Report', minRole: 'constable' },
   { to: '/complaints', icon: Inbox, label: 'Public Complaints', minRole: 'constable' },
-  { to: '/deepfake', icon: ScanSearch, label: 'Deepfake Detect', minRole: 'citizen' },
-  { to: '/cctv', icon: Camera, label: 'CCTV Match', minRole: 'constable' },
+  { to: '/deepfake', icon: ScanSearch, label: 'Media Forensics', minRole: 'citizen' },
+  { to: '/cctv', icon: Camera, label: 'Face Similarity', minRole: 'constable' },
   { to: '/case-similarity', icon: GitCompare, label: 'Investigation Support', minRole: 'constable' },
+  { to: '/timeline', icon: Clock, label: 'Timeline', minRole: 'constable' },
+  { to: '/checklist', icon: CheckSquare, label: 'Checklist', minRole: 'constable' },
+  { to: '/evidence', icon: FolderOpen, label: 'Evidence', minRole: 'constable' },
+  { to: '/notes', icon: StickyNote, label: 'Officer Notes', minRole: 'constable' },
   { to: '/network', icon: Network, label: 'Network Graph', minRole: 'constable' },
   { to: '/hotspots', icon: Map, label: 'Hotspot Map', minRole: 'constable' },
   { to: '/crime-forecast', icon: TrendingUpIcon, label: 'Crime Forecast', minRole: 'constable' },

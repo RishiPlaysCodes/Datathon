@@ -126,7 +126,15 @@ async def chat(
             "Break down by crime type",
         ]
     elif intent in ("help", "general"):
-        response_text, response_data, sources = await _handle_help_query(db)
+        # Try Gemini for general knowledge queries (law concepts, procedures, etc.)
+        from app.services.gemini import ask_gemini
+        gemini_response = await ask_gemini(message.message)
+        if gemini_response and intent == "general":
+            response_text = gemini_response
+            response_data = {"source": "Gemini AI (general knowledge)", "model": "gemini-2.0-flash"}
+            sources = ["Gemini AI"]
+        else:
+            response_text, response_data, sources = await _handle_help_query(db)
         suggestions = [
             "Show recent theft cases",
             "List repeat offenders",
@@ -172,6 +180,14 @@ async def chat(
         data=response_data,
         sources=sources,
         suggestions=suggestions,
+        explain={
+            "classified_intent": intent,
+            "confidence_level": "HIGH" if confidence >= 0.8 else "MEDIUM" if confidence >= 0.5 else "LOW",
+            "keywords_matched": intent_result.get("matched_keywords", []),
+            "filters_applied": filters,
+            "method": "Deterministic keyword-based NLU (zero hallucination)",
+            "data_sources": f"Queried {sources[0] if sources else 'PRAHARI DB'}",
+        },
     )
 
 

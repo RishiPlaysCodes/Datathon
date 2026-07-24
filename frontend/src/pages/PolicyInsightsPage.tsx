@@ -151,6 +151,10 @@ export function PolicyInsightsPage() {
           </div>
         </div>
       </div>
+
+      <p className="text-[10px] text-gray-600 text-center pt-4 border-t border-gray-800/50">
+        All insights derived from actual database records. No fabricated socio-economic data. Deterministic analysis.
+      </p>
     </div>
   )
 }

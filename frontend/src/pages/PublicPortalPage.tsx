@@ -36,7 +36,7 @@ export function PublicPortalPage() {
             PRAHARI Public Portal
           </h1>
           <p className="text-gray-400 mt-2">Karnataka State Police — File complaints, detect scams, track status</p>
-          <p className="text-xs text-gray-600 mt-1">No login required · AI-powered classification · Auto-assigned to nearest police station</p>
+          <p className="text-xs text-gray-600 mt-1">No login required · Pattern-based classification · Auto-assigned to nearest police station</p>
         </div>
         <div className="flex gap-2 mb-6 justify-center flex-wrap">
           {[

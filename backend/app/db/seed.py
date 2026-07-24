@@ -107,7 +107,7 @@ CRIME_TYPES = {
     },
     "fraud": {
         "ipc": "420 IPC",
-        "bns": "318 BNS",
+        "bns": "316 BNS",
         "descriptions": [
             "Online fraud - victim lost Rs. 3.5 lakhs to fake investment scheme",
             "UPI fraud - accused tricked victim into sharing OTP",
@@ -122,7 +122,7 @@ CRIME_TYPES = {
     },
     "cyber crime": {
         "ipc": "66C/66D IT Act",
-        "bns": "318/319 BNS + IT Act",
+        "bns": "316/317 BNS + IT Act",
         "descriptions": [
             "Phishing attack - victim's bank account emptied of Rs. 8 lakhs",
             "Social media account hacked, used for extortion",

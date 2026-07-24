@@ -112,7 +112,7 @@ export function DeepfakePage() {
           Deepfake Detection
         </h1>
         <p className="text-gray-400 text-sm mt-1">
-          AI-powered media forensics — detect synthetic manipulation in images and videos
+          Media forensics — detect synthetic manipulation in images and videos using structural analysis
         </p>
       </div>
 

@@ -202,6 +202,7 @@ export function NetworkPage() {
 function NetworkVisualization({ graph }: { graph: NetworkGraph }) {
   const width = 700
   const height = 500
+  const [selectedNode, setSelectedNode] = useState<any>(null)
 
   // Deterministic force-directed layout: iteratively push connected nodes
   // apart while pulling edges together, seeded from type-based circles.
@@ -280,6 +281,7 @@ function NetworkVisualization({ graph }: { graph: NetworkGraph }) {
   }
 
   return (
+    <>
     <svg
       width="100%" height={height} viewBox={`0 0 ${width} ${height}`}
       className="bg-dark-900/50 rounded-lg cursor-grab active:cursor-grabbing select-none"
@@ -305,7 +307,7 @@ function NetworkVisualization({ graph }: { graph: NetworkGraph }) {
         const color = getNodeColor(node.type)
         const size = node.type === 'accused' ? 14 : 9
         return (
-          <g key={node.id} onMouseDown={() => handleMouseDown(node.id)} style={{ cursor: 'grab' }}>
+          <g key={node.id} onMouseDown={() => handleMouseDown(node.id)} onClick={() => setSelectedNode(node)} style={{ cursor: 'pointer' }}>
             <circle cx={pos.x} cy={pos.y} r={size + 4} fill="transparent" />
             <circle cx={pos.x} cy={pos.y} r={size} fill={color} opacity={0.85} stroke={color} strokeWidth={3} strokeOpacity={0.2} />
             <text x={pos.x} y={pos.y + size + 13} textAnchor="middle" className="text-[9px] fill-gray-400 pointer-events-none select-none">
@@ -315,5 +317,28 @@ function NetworkVisualization({ graph }: { graph: NetworkGraph }) {
         )
       })}
     </svg>
+    {/* Node Evidence Panel */}
+    {selectedNode && (
+      <div className="mt-3 p-3 bg-gray-900/80 border border-cyan-900/50 rounded-lg text-xs space-y-1">
+        <div className="flex justify-between items-center">
+          <span className="text-cyan-400 font-medium">🔍 Node Evidence: {selectedNode.label}</span>
+          <button onClick={() => setSelectedNode(null)} className="text-gray-500 hover:text-white">✕</button>
+        </div>
+        <p className="text-gray-400">Type: <span className="text-white capitalize">{selectedNode.type}</span></p>
+        {selectedNode.type === 'accused' && (
+          <>
+            <p className="text-gray-400">Connections: {graph.edges.filter(e => e.source === selectedNode.id || e.target === selectedNode.id).length} edges</p>
+            <p className="text-gray-400">Evidence: Linked through shared FIR records (co-accused relationship)</p>
+            <p className="text-gray-400">Confidence: 100% (same FIR = confirmed co-accused link)</p>
+          </>
+        )}
+        {selectedNode.type === 'fir' && <p className="text-gray-400">FIR record node — click to view details in FIR Records page</p>}
+        {selectedNode.type === 'location' && <p className="text-gray-400">Geographic node — crimes occurred at this location</p>}
+        {graph.communities.length > 0 && (
+          <p className="text-gray-400">Community: Detected by Louvain algorithm (modularity-based clustering)</p>
+        )}
+      </div>
+    )}
+    </>
   )
 }

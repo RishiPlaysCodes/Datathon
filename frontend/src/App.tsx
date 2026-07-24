@@ -19,6 +19,10 @@ import { PolicyInsightsPage } from '@/pages/PolicyInsightsPage'
 import { PolicePortalPage } from '@/pages/PolicePortalPage'
 import { CrimeForecastPage } from '@/pages/CrimeForecastPage'
 import { FIRReportPage } from '@/pages/FIRReportPage'
+import { InvestigationTimelinePage } from '@/pages/InvestigationTimelinePage'
+import { InvestigationChecklistPage } from '@/pages/InvestigationChecklistPage'
+import { EvidenceGalleryPage } from '@/pages/EvidenceGalleryPage'
+import { OfficerNotesPage } from '@/pages/OfficerNotesPage'
 
 const ROLE_LEVEL: Record<string, number> = {
   citizen: 0,
@@ -129,6 +133,22 @@ function App() {
           <Route
             path="fir-report"
             element={<RoleRoute minimumRole="constable"><FIRReportPage /></RoleRoute>}
+          />
+          <Route
+            path="timeline"
+            element={<RoleRoute minimumRole="constable"><InvestigationTimelinePage /></RoleRoute>}
+          />
+          <Route
+            path="checklist"
+            element={<RoleRoute minimumRole="constable"><InvestigationChecklistPage /></RoleRoute>}
+          />
+          <Route
+            path="evidence"
+            element={<RoleRoute minimumRole="constable"><EvidenceGalleryPage /></RoleRoute>}
+          />
+          <Route
+            path="notes"
+            element={<RoleRoute minimumRole="constable"><OfficerNotesPage /></RoleRoute>}
           />
         </Route>
         <Route path="*" element={<DefaultRoute />} />

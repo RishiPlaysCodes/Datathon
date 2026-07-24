@@ -123,6 +123,7 @@ class ChatResponse(BaseModel):
     data: Optional[Dict[str, Any]] = None
     sources: List[str] = []
     suggestions: List[str] = []
+    explain: Optional[Dict[str, Any]] = None  # Evidence trail for transparency
 
 
 # --- Risk Score Schema ---

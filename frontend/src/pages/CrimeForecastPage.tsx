@@ -44,7 +44,7 @@ export function CrimeForecastPage() {
       <div>
         <h1 className="text-xl font-bold text-white flex items-center gap-2">
           <TrendingUp className="w-5 h-5 text-primary-400" />
-          Predictive Crime Forecast
+          Crime Forecast (Historical Pattern Analysis)
         </h1>
         <p className="text-xs text-gray-500 mt-1">
           Historical pattern-based risk analysis with concrete preventive measures
@@ -162,6 +162,10 @@ export function CrimeForecastPage() {
           <p>Enter a location or district to generate a forecast</p>
         </div>
       )}
+
+      <p className="text-[10px] text-gray-600 text-center pt-4 border-t border-gray-800/50">
+        Historical pattern-based advisory. Not ML prediction. Same input = same output. Requires 2+ years data for ML model.
+      </p>
     </div>
   )
 }

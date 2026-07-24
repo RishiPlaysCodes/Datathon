@@ -34,12 +34,12 @@ router = APIRouter(prefix="/public", tags=["Public Portal"])
 INDIAN_LAWS = {
     "fraud": {
         "ipc": "420 IPC (Cheating and dishonestly inducing delivery of property)",
-        "bns": "318 BNS",
+        "bns": "316 BNS (Cheating)",
         "it_act": "Section 66D IT Act (Cheating by personation using computer resource)",
     },
     "cyber crime": {
         "ipc": "420/463/468 IPC (Cheating / Forgery)",
-        "bns": "318/319 BNS (Cheating / Cheating by personation)",
+        "bns": "316/317 BNS (Cheating / Cheating by personation)",
         "it_act": "IT Act 2000 — Section 43 (Damage to computer), Section 66 (Computer related offences), Section 66C (Identity theft), Section 66D (Cheating by personation using computer resource)",
     },
     "theft": {
@@ -99,12 +99,12 @@ INDIAN_LAWS = {
     },
     "identity theft": {
         "ipc": "419/420 IPC",
-        "bns": "317/318 BNS",
+        "bns": "316/317 BNS (Cheating / Cheating by personation)",
         "it_act": "Section 66C IT Act (Identity theft)",
     },
     "phishing": {
         "ipc": "420 IPC",
-        "bns": "318 BNS",
+        "bns": "316 BNS (Cheating)",
         "it_act": "Section 66D IT Act (Cheating by personation)",
     },
 }

@@ -161,11 +161,20 @@ def classify_intent(query: str) -> Dict[str, Any]:
     # Preserve original casing so proper names can be extracted reliably.
     filters = extract_filters(original_query)
 
+    # Collect which keywords actually matched for explainability
+    matched_keywords = []
+    if best_intent != "general":
+        for pattern in INTENT_PATTERNS.get(best_intent, []):
+            m = re.search(pattern, query_lower)
+            if m:
+                matched_keywords.append(m.group())
+
     return {
         "intent": best_intent,
         "confidence": confidence,
         "filters": filters,
         "all_scores": scores,
+        "matched_keywords": matched_keywords[:5],
     }
 
 

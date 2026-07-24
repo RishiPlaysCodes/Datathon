@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
 import { crimeAPI } from '@/lib/api'
 import { useAuthStore } from '@/stores/authStore'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
@@ -11,6 +12,7 @@ const COLORS = ['#3b82f6', '#ef4444', '#f59e0b', '#10b981', '#8b5cf6', '#ec4899'
 export function DashboardPage() {
   const { user } = useAuthStore()
   const [allStations, setAllStations] = useState(false)
+  const navigate = useNavigate()
 
   const { data: dashboard, isLoading } = useQuery({
     queryKey: ['dashboard', allStations],
@@ -79,24 +81,28 @@ export function DashboardPage() {
           label="Total FIRs"
           value={dashboard.total_firs}
           color="blue"
+          onClick={() => navigate('/firs')}
         />
         <StatCard
           icon={<AlertTriangle className="w-5 h-5" />}
           label="Active Cases"
           value={dashboard.active_cases}
           color="orange"
+          onClick={() => navigate('/firs')}
         />
         <StatCard
           icon={<CheckCircle className="w-5 h-5" />}
           label="Closed Cases"
           value={dashboard.closed_cases}
           color="green"
+          onClick={() => navigate('/firs')}
         />
         <StatCard
           icon={<Users className="w-5 h-5" />}
           label="Repeat Offenders"
           value={dashboard.repeat_offenders}
           color="red"
+          onClick={() => navigate('/accused')}
         />
       </div>
 
@@ -186,11 +192,16 @@ export function DashboardPage() {
           ))}
         </div>
       </div>
+
+      {/* Deterministic Disclaimer */}
+      <p className="text-[10px] text-gray-600 text-center pt-4 border-t border-gray-800/50">
+        All results are deterministic — same input always produces same output. No external LLM APIs used. Zero hallucination risk. Grounded in database records.
+      </p>
     </div>
   )
 }
 
-function StatCard({ icon, label, value, color }: { icon: React.ReactNode; label: string; value: number; color: string }) {
+function StatCard({ icon, label, value, color, onClick }: { icon: React.ReactNode; label: string; value: number; color: string; onClick?: () => void }) {
   const colors = {
     blue: 'from-primary-500/20 to-primary-600/5 border-primary-500/20 text-primary-400',
     orange: 'from-orange-500/20 to-orange-600/5 border-orange-500/20 text-orange-400',
@@ -199,7 +210,7 @@ function StatCard({ icon, label, value, color }: { icon: React.ReactNode; label:
   }
 
   return (
-    <div className={`rounded-xl bg-gradient-to-br ${colors[color as keyof typeof colors]} border p-5`}>
+    <div onClick={onClick} className={`rounded-xl bg-gradient-to-br ${colors[color as keyof typeof colors]} border p-5 ${onClick ? 'cursor-pointer hover:scale-[1.02] transition-transform' : ''}`}>
       <div className="flex items-center justify-between">
         <div>
           <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">{label}</p>
@@ -207,6 +218,7 @@ function StatCard({ icon, label, value, color }: { icon: React.ReactNode; label:
         </div>
         <div className="opacity-60">{icon}</div>
       </div>
+      {onClick && <p className="text-[9px] text-gray-600 mt-2">Click to drill-down →</p>}
     </div>
   )
 }

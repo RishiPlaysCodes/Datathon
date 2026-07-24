@@ -159,12 +159,25 @@ export function AccusedPage() {
                   ))}
                 </div>
 
-                {/* Explanation */}
-                <div className="mt-4 p-3 rounded-lg bg-dark-800/80 border border-dark-700/30">
+                {/* Explanation + Drill-down */}
+                <div className="mt-4 p-3 rounded-lg bg-dark-800/80 border border-dark-700/30 space-y-2">
                   <p className="text-xs text-gray-300 leading-relaxed">
                     <Shield className="w-3 h-3 inline mr-1 text-primary-400" />
                     {profile.risk_breakdown.explanation}
                   </p>
+                  <details className="text-xs">
+                    <summary className="text-cyan-500 cursor-pointer hover:text-cyan-400">🔍 Drill-down: How is this score calculated?</summary>
+                    <div className="mt-2 space-y-2 pl-3 border-l border-cyan-900/50">
+                      {profile.risk_breakdown.factors.map((f: any, i: number) => (
+                        <div key={i} className="text-gray-400">
+                          <p className="text-gray-300 font-medium">{f.name} ({f.score}/{f.max_score})</p>
+                          <p className="text-gray-500">Reason: {f.reason}</p>
+                          <p className="text-gray-600">Weight: {((f.max_score / profile.risk_breakdown.factors.reduce((s: number, x: any) => s + x.max_score, 0)) * 100).toFixed(0)}% of total score</p>
+                        </div>
+                      ))}
+                      <p className="text-gray-600 italic mt-2">This is a rule-based weighted formula. Not ML-based. Updated on new FIR registration.</p>
+                    </div>
+                  </details>
                 </div>
               </div>
 
