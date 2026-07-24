@@ -69,8 +69,46 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: str = ""
 
     class Config:
-        env_file = ".env"
+        # NOTE: env_file intentionally NOT set here. A .env file created by
+        # PowerShell on Windows is often UTF-16/BOM encoded, which crashes
+        # pydantic-settings' UTF-8 dotenv reader. We load .env manually below
+        # (encoding-safe) and populate os.environ, so Settings() reads from
+        # the environment and never touches the raw file.
         case_sensitive = True
 
 
+def _safe_load_dotenv() -> None:
+    """Load .env into os.environ, tolerating UTF-16/BOM/garbled encodings.
+
+    This never raises — a malformed .env is simply skipped so the app still
+    starts. Real environment variables always take precedence.
+    """
+    for base in (os.getcwd(), os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))):
+        env_path = os.path.join(base, ".env")
+        if not os.path.isfile(env_path):
+            continue
+        raw = None
+        for enc in ("utf-8-sig", "utf-16", "utf-16-le", "latin-1"):
+            try:
+                with open(env_path, "r", encoding=enc) as fh:
+                    raw = fh.read()
+                break
+            except (UnicodeError, OSError):
+                continue
+        if not raw:
+            continue
+        for line in raw.splitlines():
+            line = line.strip().lstrip("\ufeff")
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, value = line.partition("=")
+            key = key.strip()
+            value = value.strip().strip('"').strip("'")
+            # Real environment variables win over the file.
+            if key and key not in os.environ:
+                os.environ[key] = value
+        break
+
+
+_safe_load_dotenv()
 settings = Settings()
