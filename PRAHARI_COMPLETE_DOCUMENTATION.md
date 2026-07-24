@@ -63,6 +63,31 @@ PRAHARI solves this by building a Crime Intelligence Operating System where one 
 | 23 | Synthetic Data Generator | Infra | 220+ realistic Karnataka FIRs auto-generated |
 | 24 | Docker Compose Deploy | Infra | One command starts everything |
 | 25 | Modern Dark UI | Frontend | Glass-morphism design, responsive, professional |
+| 26 | Public Complaint Portal | Public | Citizens file FIR without login, AI classifies crime + law |
+| 27 | POCSO Auto-Detection | Public | Extracts age from text, auto-escalates CRITICAL |
+| 28 | Scam Detection Engine | Public | Paste message → detect 10 scam types + advisory |
+| 29 | Complaint Tracking | Public | 5-stage visual timeline, tracking number |
+| 30 | Police Complaints Inbox | Police | Real-time inbox (30s refresh), convert to FIR |
+| 31 | Zone-Based Filtering | Police | 50 Karnataka stations, officer sees own station by default |
+| 32 | AI Investigation Report | Police | 9-section auto-generated report per FIR with PDF export |
+| 33 | Investigation Timeline | Police | 6-stage progress tracking with gap detection |
+| 34 | Investigation Checklist | Police | 10 auto-generated items with check-off + progress bar |
+| 35 | Evidence Gallery | Police | Upload files (max 10MB), grid view, chain-of-custody hash |
+| 36 | Officer Notes | Police | Timestamped typed notes per FIR |
+| 37 | Crime Forecast | Analytics | Historical pattern analysis + peak time/day + preventive measures |
+| 38 | Policy Insights | Analytics | Real victim/offender demographics + policy recommendations |
+| 39 | Offender Profiling | Analytics | Infer profile from similar solved cases |
+| 40 | Media Forensics | Forensics | Byte-level deepfake detection (metadata + pixel analysis) |
+| 41 | Face Similarity | Forensics | CCTV upload → accused database match (demo mode) |
+| 42 | Case Similarity Engine | Investigation | Find related cases by MO/location/time overlap |
+| 43 | English + Hinglish + Kannada | AI Chat | Trilingual NLU with native script support |
+| 44 | Voice Input + Output | AI Chat | Speech-to-text + text-to-speech (Web Speech API) |
+| 45 | Gemini AI Fallback | AI Chat | General knowledge queries via Gemini 2.0 Flash |
+| 46 | Explain This Panel | AI Chat | Evidence trail on every AI response |
+| 47 | Risk Drill-Down | Accused | Click factor → expand with weight + evidence |
+| 48 | Clickable Dashboard KPIs | Dashboard | Click card → navigate to filtered view |
+| 49 | Network Evidence Panel | Network | Click node → see type, connections, confidence |
+| 50 | PII Masking | Security | Role-based field masking (constable sees masked) |
 
 ---
 
@@ -86,7 +111,9 @@ PRAHARI solves this by building a Crime Intelligence Operating System where one 
 | State | Zustand | Tiny (1KB), simple, no boilerplate like Redux |
 | Data Fetching | React Query | Auto-caching, refetch, loading states handled |
 | HTTP | Axios | Request/response interceptors for token refresh |
-| Deployment | Docker Compose | One file defines all services, one command starts all |
+| Deployment | Docker Compose / Zoho Catalyst | Docker for local dev; Catalyst (AppSail + Web Client) for production |
+| AI (General) | Google Gemini 2.0 Flash | Fallback for general knowledge queries (law concepts, procedures) |
+| Voice | Web Speech API | Browser-native speech-to-text + text-to-speech |
 
 ---
 
