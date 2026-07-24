@@ -86,7 +86,7 @@ PostgreSQL 15 | Redis 7 | NetworkX
 - Multi-turn conversational AI with context memory
 - Hash-chained immutable audit logs (SHA-256)
 - Role-based access control (5 tiers)
-- Responsive modern dark UI
+- Responsive modern dark UI+classy
 
 ---
 
