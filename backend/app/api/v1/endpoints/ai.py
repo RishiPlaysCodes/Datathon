@@ -517,8 +517,12 @@ async def _handle_help_query(db: AsyncSession):
 
 
 @router.get("/gemini-status")
-async def gemini_status(current_user: User = Depends(require_role("constable"))):
-    """Diagnostic: check if Gemini API key is configured and working."""
+async def gemini_status():
+    """Diagnostic: check if Gemini API key is configured and working.
+
+    No auth required — safe because it only reveals the key prefix (6 chars)
+    and model availability, never the full key or any crime data.
+    """
     from app.services.gemini import gemini_diagnostic
     return await gemini_diagnostic()
 
