@@ -125,8 +125,8 @@ async def chat(
             "Compare districts",
             "Break down by crime type",
         ]
-    elif intent in ("help", "general"):
-        # Try Gemini for general knowledge queries (law concepts, procedures, etc.)
+    elif intent == "general":
+        # No crime intent matched — use Gemini for general knowledge
         from app.services.gemini import ask_gemini
         gemini_response = await ask_gemini(message.message)
         if gemini_response:
@@ -135,6 +135,15 @@ async def chat(
             sources = ["Gemini AI"]
         else:
             response_text, response_data, sources = await _handle_help_query(db)
+        suggestions = [
+            "Show recent theft cases",
+            "List repeat offenders",
+            "Crime statistics this month",
+            "Crime hotspots in Bangalore",
+        ]
+    elif intent == "help":
+        # User explicitly asked for help — show capabilities (no API call)
+        response_text, response_data, sources = await _handle_help_query(db)
         suggestions = [
             "Show recent theft cases",
             "List repeat offenders",
