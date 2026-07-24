@@ -129,7 +129,7 @@ async def chat(
         # Try Gemini for general knowledge queries (law concepts, procedures, etc.)
         from app.services.gemini import ask_gemini
         gemini_response = await ask_gemini(message.message)
-        if gemini_response and intent == "general":
+        if gemini_response:
             response_text = gemini_response
             response_data = {"source": "Gemini AI (general knowledge)", "model": "gemini-2.0-flash"}
             sources = ["Gemini AI"]

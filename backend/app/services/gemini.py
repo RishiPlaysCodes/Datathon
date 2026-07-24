@@ -21,7 +21,8 @@ GEMINI_SYSTEM_PROMPT = (
 
 async def ask_gemini(user_query: str, context: str = "") -> str | None:
     """Call Gemini 2.0 Flash and return the response text, or None on failure."""
-    api_key = settings.GEMINI_API_KEY
+    import os
+    api_key = os.environ.get("GEMINI_API_KEY", "") or settings.GEMINI_API_KEY
     if not api_key:
         logger.info("GEMINI_API_KEY not configured — skipping Gemini call")
         return None
@@ -53,8 +54,9 @@ async def ask_gemini(user_query: str, context: str = "") -> str | None:
                 parts = candidates[0].get("content", {}).get("parts", [])
                 if parts:
                     return parts[0].get("text", "").strip()
+            logger.warning(f"Gemini returned no candidates: {data}")
     except httpx.TimeoutException:
-        logger.warning("Gemini request timed out")
+        logger.warning("Gemini request timed out (15s)")
     except Exception as e:
         logger.error(f"Gemini error: {e}")
 
