@@ -78,6 +78,22 @@ async def chat(
         # New (explicit) filters override carried-forward ones.
         filters = {**prev_filters, **filters}
 
+    # Knowledge-question override. The crime NLU is greedy: a genuine law/
+    # procedure question like "punishment for theft under BNS" or "cyber crime
+    # helpline number" gets grabbed by search_firs just because it shares a
+    # keyword. If the message is clearly an informational question AND our
+    # curated knowledge base has an answer, treat it as a general query so the
+    # KB can respond. DB-search phrasings ("show theft cases", "chori dikhao")
+    # are excluded by is_informational(), so this never hijacks real searches.
+    from app.services.knowledge import is_informational, lookup as kb_lookup
+
+    kb_hit = None
+    if intent in ("search_firs", "accused_info", "general") and is_informational(message.message):
+        kb_hit = kb_lookup(message.message)
+        if kb_hit:
+            intent = "general"
+            confidence = 0.9
+
     # Route to appropriate handler
     response_data = None
     sources = []
@@ -126,15 +142,32 @@ async def chat(
             "Break down by crime type",
         ]
     elif intent == "general":
-        # No crime intent matched — use Gemini for general knowledge
-        from app.services.gemini import ask_gemini
-        gemini_response = await ask_gemini(message.message)
-        if gemini_response:
-            response_text = gemini_response
-            response_data = {"source": "Gemini AI (general knowledge)", "model": "gemini-2.0-flash"}
-            sources = ["Gemini AI"]
+        # No crime-database intent matched. Answer general law/procedure
+        # questions in this order:
+        #   1. Deterministic knowledge base  — free, reliable, zero hallucination
+        #   2. Gemini AI                      — only if the KB has no match
+        #   3. Capability/help menu           — last resort, never dead-ends
+        # kb_hit may already be set by the knowledge-question override above; if
+        # not (e.g. a plain general query), look it up now.
+        if kb_hit is None:
+            kb_hit = kb_lookup(message.message)
+        if kb_hit:
+            response_text = kb_hit["answer"]
+            response_data = {
+                "source": "PRAHARI Legal Knowledge Base",
+                "reference": kb_hit["source"],
+                "matched_keywords": kb_hit["matched_keywords"],
+            }
+            sources = [kb_hit["source"]]
         else:
-            response_text, response_data, sources = await _handle_help_query(db)
+            from app.services.gemini import ask_gemini
+            gemini_response = await ask_gemini(message.message)
+            if gemini_response:
+                response_text = gemini_response
+                response_data = {"source": "Gemini AI (general knowledge)", "model": "gemini-2.0-flash"}
+                sources = ["Gemini AI"]
+            else:
+                response_text, response_data, sources = await _handle_help_query(db)
         suggestions = [
             "Show recent theft cases",
             "List repeat offenders",
