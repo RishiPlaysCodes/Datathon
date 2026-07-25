@@ -110,7 +110,7 @@ async def list_evidence(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_role("constable")),
 ):
-    """List all evidence for a FIR (without file data — use /evidence/{id} to download)."""
+    """List all evidence for a FIR with preview metadata (use /evidence/{id}/preview to download)."""
     results = (
         await db.execute(select(Evidence).where(Evidence.fir_id == fir_id).order_by(Evidence.created_at))
     ).scalars().all()
@@ -125,9 +125,99 @@ async def list_evidence(
             "description": e.description,
             "uploaded_by": e.uploaded_by_name,
             "created_at": e.created_at.isoformat() if e.created_at else None,
+            "preview_url": f"/api/v1/investigation/evidence/{e.id}/preview",
+            "is_previewable": _is_previewable(e.mime_type, e.filename),
+            "file_category": _get_file_category(e.mime_type, e.filename),
         }
         for e in results
     ]
+
+
+def _is_previewable(mime_type: Optional[str], filename: Optional[str]) -> bool:
+    """Check if the file can be previewed inline in a browser."""
+    if mime_type and mime_type.startswith(("image/", "application/pdf")):
+        return True
+    if filename:
+        ext = os.path.splitext(filename)[1].lower()
+        return ext in {".jpg", ".jpeg", ".png", ".gif", ".pdf", ".webp"}
+    return False
+
+
+def _get_file_category(mime_type: Optional[str], filename: Optional[str]) -> str:
+    """Classify evidence file for UI display."""
+    ext = os.path.splitext(filename)[1].lower() if filename else ""
+    if mime_type:
+        if mime_type.startswith("image/"):
+            return "image"
+        if mime_type.startswith("video/"):
+            return "video"
+        if mime_type == "application/pdf":
+            return "document"
+    # Fallback to extension
+    if ext in {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"}:
+        return "image"
+    if ext in {".mp4", ".avi", ".mov", ".mkv"}:
+        return "video"
+    if ext in {".pdf", ".doc", ".docx"}:
+        return "document"
+    return "other"
+
+
+@router.get("/evidence/{evidence_id}/preview")
+async def get_evidence_preview(
+    evidence_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_role("constable")),
+):
+    """Download/preview an evidence file. Returns the raw file with correct MIME type.
+
+    For images: renders inline in the browser (Content-Disposition: inline).
+    For documents: triggers download (Content-Disposition: attachment).
+    Chain-of-custody access is logged.
+    """
+    from fastapi.responses import Response as RawResponse
+
+    evidence = (
+        await db.execute(select(Evidence).where(Evidence.id == evidence_id))
+    ).scalar_one_or_none()
+    if not evidence:
+        raise HTTPException(status_code=404, detail="Evidence not found")
+
+    if not evidence.file_data:
+        raise HTTPException(status_code=404, detail="Evidence file data not available")
+
+    # Decode base64 stored data
+    file_bytes = base64.b64decode(evidence.file_data)
+
+    # Update chain of custody with access record
+    try:
+        chain = json.loads(evidence.chain_of_custody) if evidence.chain_of_custody else []
+    except (json.JSONDecodeError, TypeError):
+        chain = []
+    chain.append({
+        "action": "accessed/previewed",
+        "by": current_user.full_name,
+        "at": datetime.now().isoformat(),
+    })
+    evidence.chain_of_custody = json.dumps(chain)
+    await db.commit()
+
+    # Determine content disposition
+    mime = evidence.mime_type or "application/octet-stream"
+    is_inline = _is_previewable(mime, evidence.filename)
+    disposition = "inline" if is_inline else "attachment"
+    filename_header = f'filename="{evidence.filename}"' if evidence.filename else ""
+
+    return RawResponse(
+        content=file_bytes,
+        media_type=mime,
+        headers={
+            "Content-Disposition": f"{disposition}; {filename_header}",
+            "Content-Length": str(len(file_bytes)),
+            "X-Evidence-Id": str(evidence.id),
+            "X-Chain-Of-Custody-Entries": str(len(chain)),
+        },
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
