@@ -87,10 +87,15 @@ async def chat(
     # are excluded by is_informational(), so this never hijacks real searches.
     from app.services.knowledge import is_informational, lookup as kb_lookup
 
+    # 'help' is included because words like "helpline" get classified as a help
+    # request (they contain "help"); a KB match rescues those (e.g. "women
+    # helpline number"). We keep the rich capability menu for pure capability
+    # questions by not letting the generic "what is PRAHARI" card override help.
     kb_hit = None
-    if intent in ("search_firs", "accused_info", "general") and is_informational(message.message):
-        kb_hit = kb_lookup(message.message)
-        if kb_hit:
+    if intent in ("search_firs", "accused_info", "general", "help") and is_informational(message.message):
+        candidate = kb_lookup(message.message)
+        if candidate and not (intent == "help" and candidate["key"] == "what_is_prahari"):
+            kb_hit = candidate
             intent = "general"
             confidence = 0.9
 

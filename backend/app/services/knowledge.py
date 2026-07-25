@@ -263,7 +263,7 @@ KNOWLEDGE_BASE: List[KnowledgeEntry] = [
         key="ndps",
         keywords=[
             "ndps", "drug law", "narcotic", "ganja", "drugs punishment", "nasha",
-            "madaka", "drug section",
+            "madaka", "drug section", "drug", "drugs", "drug case", "drug offence",
         ],
         answer=(
             "**NDPS Act, 1985 (drugs)**\n"
