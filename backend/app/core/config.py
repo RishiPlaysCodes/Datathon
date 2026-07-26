@@ -13,7 +13,7 @@ except ImportError:
 # locally and on Catalyst (which allows writes only in the OS temp dir).
 # Version the ephemeral demo database so deployments created before the citizen
 # and OSINT columns cannot be reused with an incompatible SQLite schema.
-_DB_PATH = os.path.join(tempfile.gettempdir(), "prahari_v3.db")
+_DB_PATH = os.path.join(tempfile.gettempdir(), "prahari_v4.db")
 
 
 class Settings(BaseSettings):

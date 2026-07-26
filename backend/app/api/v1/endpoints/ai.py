@@ -228,8 +228,9 @@ async def _handle_fir_search(db: AsyncSession, filters: dict, query: str, lang: 
     )
     firs = result.scalars().all()
 
+    from app.services.i18n import t
     if not firs:
-        return "No FIRs found matching your query. Try broadening your search criteria.", None, []
+        return t("no_firs_found", lang), None, []
 
     # Check for repeat offenders filter
     if filters.get("repeat_offenders"):
@@ -253,17 +254,20 @@ async def _handle_fir_search(db: AsyncSession, filters: dict, query: str, lang: 
     for f in firs:
         crime_types[f.crime_type] = crime_types.get(f.crime_type, 0) + 1
 
-    response = f"Found **{len(firs)} FIRs** matching your query.\n\n"
-    response += "**Crime Type Breakdown:**\n"
+    response = t("firs_found", lang, count=len(firs)) + "\n\n"
+    response += t("crime_type_breakdown", lang) + "\n"
+    cases_word = t("cases", lang)
     for ct, count in sorted(crime_types.items(), key=lambda x: -x[1]):
-        response += f"- {ct}: {count} cases\n"
+        response += f"- {ct}: {count} {cases_word}\n"
 
     if firs:
-        response += f"\n**Date Range:** {firs[-1].date_of_occurrence.strftime('%d %b %Y') if firs[-1].date_of_occurrence else 'N/A'} to {firs[0].date_of_occurrence.strftime('%d %b %Y') if firs[0].date_of_occurrence else 'N/A'}"
+        start = firs[-1].date_of_occurrence.strftime('%d %b %Y') if firs[-1].date_of_occurrence else 'N/A'
+        end = firs[0].date_of_occurrence.strftime('%d %b %Y') if firs[0].date_of_occurrence else 'N/A'
+        response += "\n" + t("date_range", lang, start=start, end=end)
 
     locations = list(set(f.location_name for f in firs if f.location_name))[:5]
     if locations:
-        response += f"\n**Locations:** {', '.join(locations)}"
+        response += "\n" + t("locations", lang, locs=', '.join(locations))
 
     return response, {"firs": fir_data, "total": len(firs)}, sources
 
@@ -286,8 +290,9 @@ async def _handle_accused_query(db: AsyncSession, filters: dict, query: str, lan
     result = await db.execute(q)
     accused_list = result.scalars().all()
 
+    from app.services.i18n import t, get_risk_label
     if not accused_list:
-        return "No accused persons found matching your query.", None, []
+        return t("no_accused_found", lang), None, []
 
     accused_data = []
     for a in accused_list:
@@ -301,12 +306,14 @@ async def _handle_accused_query(db: AsyncSession, filters: dict, query: str, lan
             "gang_id": a.gang_id,
         })
 
-    response = f"Found **{len(accused_list)} accused persons**:\n\n"
+    response = t("accused_found", lang, count=len(accused_list)) + "\n\n"
+    cases_word = t("cases", lang)
+    repeat_word = t("repeat_offender", lang)
     for a in accused_list[:5]:
-        risk_label = "HIGH" if a.risk_score >= 70 else "MEDIUM" if a.risk_score >= 40 else "LOW"
-        response += f"- **{a.name}** (Risk: {a.risk_score:.0f}/100 - {risk_label}) | {a.total_cases} cases"
+        risk_label = get_risk_label(a.risk_score, lang)
+        response += f"- **{a.name}** (Risk: {a.risk_score:.0f}/100 - {risk_label}) | {a.total_cases} {cases_word}"
         if a.is_repeat_offender:
-            response += " | REPEAT OFFENDER"
+            response += f" | {repeat_word}"
         response += "\n"
 
     sources = [f"Accused Profile: {a.name}" for a in accused_list[:5]]
@@ -326,19 +333,21 @@ async def _handle_network_query(db: AsyncSession, filters: dict, query: str, lan
         accused = result.scalar_one_or_none()
         if accused:
             from app.services.network import build_network_graph
+            from app.services.i18n import t
             graph = await build_network_graph(db, accused.id, depth=2)
-            response = f"**Criminal Network for {accused.name}:**\n\n"
-            response += f"- Nodes: {len(graph.nodes)}\n"
-            response += f"- Connections: {len(graph.edges)}\n"
+            response = t("network_title", lang, name=accused.name) + "\n\n"
+            response += f"- {t('network_nodes', lang)}: {len(graph.nodes)}\n"
+            response += f"- {t('network_connections', lang)}: {len(graph.edges)}\n"
             if graph.communities:
                 response += f"- Communities detected: {len(graph.communities)}\n"
             if graph.key_players:
-                response += "\n**Key Players:**\n"
+                response += "\n" + t("key_players", lang) + "\n"
                 for kp in graph.key_players[:3]:
                     response += f"- {kp['name']} (centrality: {kp.get('centrality', 0):.2f})\n"
             return response, graph.model_dump(), [f"Network: {accused.name}"]
 
-    return "Please specify an accused person's name to view their network.", None, []
+    from app.services.i18n import t as _t
+    return _t("specify_name_network", lang), None, []
 
 
 async def _handle_hotspot_query(db: AsyncSession, filters: dict, query: str, lang: str = "en"):
@@ -362,20 +371,22 @@ async def _handle_hotspot_query(db: AsyncSession, filters: dict, query: str, lan
     )
     hotspots = result.all()
 
+    from app.services.i18n import t
     if not hotspots:
-        return "No hotspot data available for the specified criteria.", None, []
+        return t("no_firs_found", lang), None, []
 
     hotspot_data = [
         {"lat": h[0], "lng": h[1], "crime_type": h[2], "location": h[3], "count": h[4]}
         for h in hotspots
     ]
 
-    response = f"**Crime Hotspots (last {days} days):**\n\n"
+    response = t("hotspot_title", lang, days=days) + "\n\n"
+    cases_word = t("cases", lang)
     for h in hotspots[:5]:
-        response += f"- **{h[3] or 'Unknown Location'}** ({h[2]}): {h[4]} cases\n"
+        response += f"- **{h[3] or 'Unknown Location'}** ({h[2]}): {h[4]} {cases_word}\n"
 
     total_crimes = sum(h[4] for h in hotspots)
-    response += f"\n**Total incidents in hotspots:** {total_crimes}"
+    response += "\n" + t("total_incidents_hotspot", lang, count=total_crimes)
 
     return response, {"hotspots": hotspot_data}, ["Spatial Analysis"]
 
@@ -402,10 +413,11 @@ async def _handle_risk_query(db: AsyncSession, filters: dict, query: str, lang: 
                 fir_result = await db.execute(select(FIR).where(FIR.id.in_(fir_ids)))
                 firs = [FIRResponse.model_validate(f) for f in fir_result.scalars().all()]
 
+            from app.services.i18n import t
             risk = calculate_risk_score(accused, firs)
-            response = f"**Risk Assessment for {accused.name}:**\n\n"
-            response += f"**Overall Risk Score: {risk['total_score']:.0f}/100**\n\n"
-            response += "**Breakdown:**\n"
+            response = t("risk_title", lang, name=accused.name) + "\n\n"
+            response += t("risk_overall", lang, score=f"{risk['total_score']:.0f}") + "\n\n"
+            response += t("risk_breakdown", lang) + "\n"
             for factor in risk.get("factors", []):
                 response += f"- {factor['name']}: {factor['score']:.0f} ({factor['reason']})\n"
             response += f"\n**Assessment:** {risk['explanation']}"
@@ -413,18 +425,20 @@ async def _handle_risk_query(db: AsyncSession, filters: dict, query: str, lang: 
             return response, {"risk": risk, "accused_id": accused.id}, [f"Risk: {accused.name}"]
 
     # If no specific person, show top risky offenders
+    from app.services.i18n import t
     result = await db.execute(
         select(Accused).where(Accused.risk_score >= 50).order_by(Accused.risk_score.desc()).limit(5)
     )
     top_risky = result.scalars().all()
     if top_risky:
-        response = "**Top High-Risk Offenders:**\n\n"
+        response = t("top_risky", lang) + "\n\n"
+        cases_word = t("cases", lang)
         for a in top_risky:
-            response += f"- **{a.name}** - Risk: {a.risk_score:.0f}/100 | Cases: {a.total_cases}\n"
+            response += f"- **{a.name}** - Risk: {a.risk_score:.0f}/100 | {a.total_cases} {cases_word}\n"
         data = [{"id": a.id, "name": a.name, "risk_score": a.risk_score} for a in top_risky]
         return response, {"top_risky": data}, ["Risk Assessment Engine"]
 
-    return "No high-risk offenders found. Specify a name for individual assessment.", None, []
+    return t("specify_name_risk", lang), None, []
 
 
 async def _handle_statistics_query(db: AsyncSession, filters: dict, query: str, lang: str = "en"):
@@ -466,12 +480,13 @@ async def _handle_statistics_query(db: AsyncSession, filters: dict, query: str, 
     )
     by_district = district_result.all()
 
-    response = f"**Crime Statistics (last {days} days):**\n\n"
-    response += f"**Total FIRs:** {total}\n\n"
-    response += "**By Crime Type:**\n"
+    from app.services.i18n import t
+    response = t("crime_statistics", lang, days=days) + "\n\n"
+    response += t("total_firs", lang, count=total) + "\n\n"
+    response += t("by_crime_type", lang) + "\n"
     for ct, count in by_type[:5]:
         response += f"- {ct}: {count}\n"
-    response += "\n**By District:**\n"
+    response += "\n" + t("by_district", lang) + "\n"
     for d, count in by_district[:5]:
         response += f"- {d}: {count}\n"
 
