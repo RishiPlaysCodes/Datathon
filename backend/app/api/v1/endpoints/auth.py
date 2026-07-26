@@ -154,3 +154,37 @@ async def refresh_token(token_data: TokenRefresh, db: AsyncSession = Depends(get
 async def get_me(current_user: User = Depends(get_current_user)):
     """Get current user profile."""
     return UserResponse.model_validate(current_user)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# LANGUAGE PREFERENCE
+# ═══════════════════════════════════════════════════════════════════════════════
+
+from pydantic import BaseModel as _BaseModel
+
+
+class LanguageRequest(_BaseModel):
+    language: str  # "en", "hi", "kn"
+
+
+@router.get("/language")
+async def get_language(current_user: User = Depends(get_current_user)):
+    """Get user's current language preference."""
+    return {"language": current_user.language or "en"}
+
+
+@router.put("/language")
+async def set_language(
+    req: LanguageRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Set user's language preference (en/hi/kn). Affects all AI responses and reports."""
+    from app.services.i18n import get_lang, t
+    lang = get_lang(req.language)
+    current_user.language = lang
+    await db.commit()
+    return {
+        "language": lang,
+        "message": t("language_changed", lang),
+    }

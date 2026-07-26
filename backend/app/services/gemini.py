@@ -3,10 +3,17 @@
 Used when the deterministic NLU cannot map a user query to a specific
 crime-intelligence intent. Routes general questions (about Indian law,
 investigation procedures, criminology concepts) to Google Gemini.
+
+SECURITY:
+- API key is NEVER exposed in any response (only first 6 chars in diagnostics)
+- Rate limited: max 10 Gemini calls per user per hour (prevents abuse/cost explosion)
+- Key is server-side only — frontend never sees or sends it
 """
 import os
+import time
 import httpx
 import logging
+from collections import defaultdict
 from app.core.config import settings
 
 logger = logging.getLogger("prahari.gemini")
@@ -28,20 +35,44 @@ GEMINI_MODELS = [
     "gemini-flash-latest",
 ]
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# RATE LIMITER — prevents API key misuse/cost explosion
+# ═══════════════════════════════════════════════════════════════════════════════
+_MAX_CALLS_PER_HOUR = 10
+_rate_store: dict = defaultdict(list)  # user_id -> [timestamps]
+
+
+def _check_rate_limit(user_id: int) -> bool:
+    """Return True if user is within rate limit, False if exceeded."""
+    now = time.time()
+    window = now - 3600  # 1 hour window
+    # Clean old entries
+    _rate_store[user_id] = [ts for ts in _rate_store[user_id] if ts > window]
+    if len(_rate_store[user_id]) >= _MAX_CALLS_PER_HOUR:
+        return False
+    _rate_store[user_id].append(now)
+    return True
+
 
 def _get_api_key() -> str:
     return os.environ.get("GEMINI_API_KEY", "") or settings.GEMINI_API_KEY
 
 
-async def ask_gemini(user_query: str, context: str = "") -> str | None:
+async def ask_gemini(user_query: str, context: str = "", user_id: int = 0) -> str | None:
     """Call Gemini and return the response text, or None on failure.
 
+    Rate limited: max 10 calls per user per hour. API key never exposed.
     Tries multiple model names and uses the x-goog-api-key header (works with
     both classic AIzaSy... keys and newer AQ.* keys from AI Studio).
     """
     api_key = _get_api_key()
     if not api_key:
         logger.warning("GEMINI: no API key configured — using deterministic fallback")
+        return None
+
+    # Rate limit check
+    if user_id and not _check_rate_limit(user_id):
+        logger.warning(f"GEMINI: rate limit exceeded for user {user_id}")
         return None
 
     prompt = f"{GEMINI_SYSTEM_PROMPT}\n\nContext: {context}\n\nUser: {user_query}"

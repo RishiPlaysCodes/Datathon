@@ -51,6 +51,7 @@ async def chat(
 ):
     """Process natural language query and return intelligence."""
     session_id = message.session_id or str(uuid.uuid4())
+    lang = current_user.language or "en"
 
     # Save user message to history
     user_msg = ConversationHistory(
@@ -105,47 +106,25 @@ async def chat(
     suggestions = []
 
     if intent == "search_firs":
-        response_text, response_data, sources = await _handle_fir_search(db, filters, message.message)
-        suggestions = [
-            "Show me the accused in these cases",
-            "Display on hotspot map",
-            "Filter by repeat offenders only",
-        ]
+        response_text, response_data, sources = await _handle_fir_search(db, filters, message.message, lang)
+        from app.services.i18n import get_suggestions as _gs2
+        suggestions = _gs2("search_firs", lang)
     elif intent == "accused_info":
-        response_text, response_data, sources = await _handle_accused_query(db, filters, message.message)
-        suggestions = [
-            "Show criminal network",
-            "Calculate risk score",
-            "Find similar offenders",
-        ]
+        response_text, response_data, sources = await _handle_accused_query(db, filters, message.message, lang)
+        from app.services.i18n import get_suggestions as _gs3
+        suggestions = _gs3("accused_info", lang)
     elif intent == "network_analysis":
-        response_text, response_data, sources = await _handle_network_query(db, filters, message.message)
-        suggestions = [
-            "Who is the most connected person?",
-            "Show gang affiliations",
-            "Expand to 3 degrees",
-        ]
+        response_text, response_data, sources = await _handle_network_query(db, filters, message.message, lang)
+        suggestions = []
     elif intent == "hotspot_analysis":
-        response_text, response_data, sources = await _handle_hotspot_query(db, filters, message.message)
-        suggestions = [
-            "Predict next week's hotspots",
-            "Show patrol recommendations",
-            "Compare with last month",
-        ]
+        response_text, response_data, sources = await _handle_hotspot_query(db, filters, message.message, lang)
+        suggestions = []
     elif intent == "risk_assessment":
-        response_text, response_data, sources = await _handle_risk_query(db, filters, message.message)
-        suggestions = [
-            "Show risk breakdown",
-            "Compare with similar offenders",
-            "Show escalation pattern",
-        ]
+        response_text, response_data, sources = await _handle_risk_query(db, filters, message.message, lang)
+        suggestions = []
     elif intent == "statistics":
-        response_text, response_data, sources = await _handle_statistics_query(db, filters, message.message)
-        suggestions = [
-            "Show trend over time",
-            "Compare districts",
-            "Break down by crime type",
-        ]
+        response_text, response_data, sources = await _handle_statistics_query(db, filters, message.message, lang)
+        suggestions = []
     elif intent == "general":
         # No crime-database intent matched. Answer general law/procedure
         # questions in this order:
@@ -166,40 +145,25 @@ async def chat(
             sources = [kb_hit["source"]]
         else:
             from app.services.gemini import ask_gemini
-            gemini_response = await ask_gemini(message.message)
+            gemini_response = await ask_gemini(message.message, user_id=current_user.id)
             if gemini_response:
                 response_text = gemini_response
                 response_data = {"source": "Gemini AI (general knowledge)", "model": "gemini-2.0-flash"}
                 sources = ["Gemini AI"]
             else:
-                response_text, response_data, sources = await _handle_help_query(db)
-        suggestions = [
-            "Show recent theft cases",
-            "List repeat offenders",
-            "Crime statistics this month",
-            "Crime hotspots in Bangalore",
-        ]
+                response_text, response_data, sources = await _handle_help_query(db, lang)
+        from app.services.i18n import get_suggestions as _gs
+        suggestions = _gs("general", lang)
     elif intent == "help":
         # User explicitly asked for help — show capabilities (no API call)
-        response_text, response_data, sources = await _handle_help_query(db)
-        suggestions = [
-            "Show recent theft cases",
-            "List repeat offenders",
-            "Crime statistics this month",
-            "Crime hotspots in Bangalore",
-        ]
+        response_text, response_data, sources = await _handle_help_query(db, lang)
+        from app.services.i18n import get_suggestions
+        suggestions = get_suggestions("general", lang)
     elif intent == "greeting":
-        response_text = (
-            "Namaste! / ನಮಸ್ಕಾರ! Main **PRAHARI** hoon - aapka Crime Intelligence Assistant. "
-            "Aap mujhse **English, Hinglish ya Kannada** mein baat kar sakte ho. "
-            "Type 'help' / 'features' / 'ಸಹಾಯ' to see everything I can do."
-        )
-        suggestions = [
-            "What can you do?",
-            "Show recent FIRs",
-            "Crime statistics this month",
-            "List repeat offenders",
-        ]
+        from app.services.i18n import t
+        response_text = t("greeting", lang)
+        from app.services.i18n import get_suggestions
+        suggestions = get_suggestions("greeting", lang)
 
     # Save assistant response
     assistant_msg = ConversationHistory(
@@ -238,7 +202,7 @@ async def chat(
     )
 
 
-async def _handle_fir_search(db: AsyncSession, filters: dict, query: str):
+async def _handle_fir_search(db: AsyncSession, filters: dict, query: str, lang: str = "en"):
     """Handle FIR search queries."""
     conditions = []
     date_from = datetime.now() - timedelta(days=filters.get("days", DEFAULT_DAYS))
@@ -304,7 +268,7 @@ async def _handle_fir_search(db: AsyncSession, filters: dict, query: str):
     return response, {"firs": fir_data, "total": len(firs)}, sources
 
 
-async def _handle_accused_query(db: AsyncSession, filters: dict, query: str):
+async def _handle_accused_query(db: AsyncSession, filters: dict, query: str, lang: str = "en"):
     """Handle accused-related queries."""
     conditions = []
     if filters.get("name"):
@@ -349,7 +313,7 @@ async def _handle_accused_query(db: AsyncSession, filters: dict, query: str):
     return response, {"accused": accused_data}, sources
 
 
-async def _handle_network_query(db: AsyncSession, filters: dict, query: str):
+async def _handle_network_query(db: AsyncSession, filters: dict, query: str, lang: str = "en"):
     """Handle network analysis queries."""
     # Try to find accused by name
     name = filters.get("name", "")
@@ -377,7 +341,7 @@ async def _handle_network_query(db: AsyncSession, filters: dict, query: str):
     return "Please specify an accused person's name to view their network.", None, []
 
 
-async def _handle_hotspot_query(db: AsyncSession, filters: dict, query: str):
+async def _handle_hotspot_query(db: AsyncSession, filters: dict, query: str, lang: str = "en"):
     """Handle hotspot analysis queries."""
     days = filters.get("days", DEFAULT_DAYS)
     date_from = datetime.now() - timedelta(days=days)
@@ -416,7 +380,7 @@ async def _handle_hotspot_query(db: AsyncSession, filters: dict, query: str):
     return response, {"hotspots": hotspot_data}, ["Spatial Analysis"]
 
 
-async def _handle_risk_query(db: AsyncSession, filters: dict, query: str):
+async def _handle_risk_query(db: AsyncSession, filters: dict, query: str, lang: str = "en"):
     """Handle risk assessment queries."""
     name = filters.get("name", "")
     if name:
@@ -463,7 +427,7 @@ async def _handle_risk_query(db: AsyncSession, filters: dict, query: str):
     return "No high-risk offenders found. Specify a name for individual assessment.", None, []
 
 
-async def _handle_statistics_query(db: AsyncSession, filters: dict, query: str):
+async def _handle_statistics_query(db: AsyncSession, filters: dict, query: str, lang: str = "en"):
     """Handle statistics queries."""
     days = filters.get("days", DEFAULT_DAYS)
     date_from = datetime.now() - timedelta(days=days)
@@ -519,31 +483,20 @@ async def _handle_statistics_query(db: AsyncSession, filters: dict, query: str):
     return response, data, ["Crime Statistics Database"]
 
 
-async def _handle_help_query(db: AsyncSession):
+async def _handle_help_query(db: AsyncSession, lang: str = "en"):
     """Explain capabilities, grounded with live database counts.
 
     This is the graceful fallback for any query we can't map to a specific
     intent, so the assistant never dead-ends with 'please rephrase'.
     """
+    from app.services.i18n import get_help
     total_firs = (await db.execute(select(func.count(FIR.id)))).scalar() or 0
     total_accused = (await db.execute(select(func.count(Accused.id)))).scalar() or 0
     repeat = (
         await db.execute(select(func.count(Accused.id)).where(Accused.is_repeat_offender == True))
     ).scalar() or 0
 
-    response = (
-        "I'm **PRAHARI**, your Crime Intelligence Assistant. I understand "
-        "**English, Hinglish and Kannada**. Here's what I can do right now over "
-        f"**{total_firs} FIRs**, **{total_accused} accused** ({repeat} repeat offenders):\n\n"
-        "**1. Search FIRs** — _\"Show chain snatching in Koramangala\"_ / _\"chori ke case dikhao\"_ / _\"ಕಳ್ಳತನ ಪ್ರಕರಣ ತೋರಿಸು\"_\n"
-        "**2. Accused Info** — _\"Tell me about Ravi Kumar\"_ / _\"aaropi ki jaankari do\"_ / _\"ಆರೋಪಿ ಯಾರು\"_\n"
-        "**3. Criminal Network** — _\"Show network for Ravi Kumar\"_ / _\"gang dikhao\"_ / _\"ಗುಂಪು ತೋರಿಸು\"_\n"
-        "**4. Crime Hotspots** — _\"Crime hotspots in Bangalore\"_ / _\"khatarnak ilaka batao\"_ / _\"ಅಪಾಯಕಾರಿ ಪ್ರದೇಶ\"_\n"
-        "**5. Risk Assessment** — _\"Risk score for the top offender\"_ / _\"kitna khatarnak hai\"_ / _\"ಅಪಾಯ ಎಷ್ಟು\"_\n"
-        "**6. Statistics & Trends** — _\"Crime statistics this month\"_ / _\"kitne case hue\"_ / _\"ಎಷ್ಟು ಪ್ರಕರಣ\"_\n\n"
-        "Follow-ups work too — after a search, say _\"only female victims\"_ or _\"sirf open cases\"_.\n"
-        "Just type (or **speak** using the mic) your question naturally."
-    )
+    response = get_help(lang, total_firs, total_accused, repeat)
     data = {
         "capabilities": [
             "search_firs", "accused_info", "network_analysis",

@@ -9,6 +9,7 @@ export interface User {
   badge_number?: string
   rank?: string
   assigned_zone?: string
+  language?: string
   is_active: boolean
   created_at?: string
 }

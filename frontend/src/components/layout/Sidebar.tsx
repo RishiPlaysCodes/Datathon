@@ -6,6 +6,7 @@ import {
   Clock, CheckSquare, FolderOpen, StickyNote
 } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
+import { LanguageSwitcher } from '@/components/LanguageSwitcher'
 
 const allNavItems = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', minRole: 'constable' },
@@ -92,6 +93,9 @@ export function Sidebar({ mobileOpen, onNavigate }: { mobileOpen: boolean; onNav
             <p className="text-sm font-medium text-gray-200 truncate">{user?.full_name}</p>
             <p className="text-xs text-gray-500 capitalize">{user?.role}</p>
           </div>
+        </div>
+        <div className="flex items-center gap-2 mb-2">
+          <LanguageSwitcher />
         </div>
         <button
           onClick={() => {
